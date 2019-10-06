@@ -152,9 +152,18 @@ menu "Bootloader config"
             Use function rtc_wdt_feed() for resetting counter of rtc_wdt.
             Use function rtc_wdt_disable() for disabling rtc_wdt.
 
+    config BOOTLOADER_WDT_DISABLE_SKIP_FIRST_BOOT
+        bool "Allows RTC watchdog to stay enabled in startup code for image first boot"
+        depends on BOOTLOADER_WDT_ENABLE
+        default n
+        help
+            If it is set, RTC watchdog will stay enabled and application firmware should disable using rtc_wdt_disable()
+            when it switches current executing firmware state to valid image.
+
     config BOOTLOADER_WDT_TIME_MS
         int "Timeout for RTC watchdog (ms)"
         depends on BOOTLOADER_WDT_ENABLE
+        default 90000 if BOOTLOADER_OTA_ROLLBACK
         default 9000
         range 0 120000
         help
@@ -162,6 +171,23 @@ menu "Bootloader config"
             Pay attention to options such as reset to factory, trigger test partition and encryption on boot
             - these options can increase the execution time.
             Note: RTC_WDT will reset while encryption operations will be performed.
+
+    config BOOTLOADER_OTA_ROLLBACK
+        bool "Enable firmare rollback support (legacy name)"
+        default y
+        select APP_ROLLBACK_ENABLE
+        select BOOTLOADER_WDT_DISABLE_SKIP_FIRST_BOOT
+        help
+            Legacy name for firmware rollback feature
+
+    config BOOTLOADER_OTA_NO_FORCE_ROLLBACK
+        bool "Disable firmware force rollback"
+        depends on BOOTLOADER_OTA_ROLLBACK
+        default y
+        help
+            If enabled bootloader will prevent force rollback to previous valid firmware image after new firmware post OTA
+            is successfully validated. This will additionally also make sure to wipe out (erase) flash contents of firmware
+            partition, hence at any moment, there will be single valid firmware image present on flash.
 
     config APP_ROLLBACK_ENABLE
         bool "Enable app rollback support"

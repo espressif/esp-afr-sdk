@@ -540,8 +540,22 @@ static void main_task(void* args)
 
     // Now that the application is about to start, disable boot watchdog
 #ifndef CONFIG_BOOTLOADER_WDT_DISABLE_IN_USER_CODE
-    rtc_wdt_disable();
+#ifdef CONFIG_BOOTLOADER_WDT_DISABLE_SKIP_FIRST_BOOT
+    bool image_first_boot = false;
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(esp_ota_get_running_partition(), &ota_state) == ESP_OK) {
+        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+            image_first_boot = true;
+        }
+    }
+    if (!image_first_boot) {
+#endif // CONFIG_BOOTLOADER_WDT_DISABLE_SKIP_FIRST_BOOT
+        rtc_wdt_disable();
+#ifdef CONFIG_BOOTLOADER_WDT_DISABLE_SKIP_FIRST_BOOT
+    }
+#endif // CONFIG_BOOTLOADER_WDT_DISABLE_SKIP_FIRST_BOOT
 #endif
+
 #ifdef CONFIG_EFUSE_SECURE_VERSION_EMULATE
     const esp_partition_t *efuse_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_EFUSE_EM, NULL);
     if (efuse_partition) {

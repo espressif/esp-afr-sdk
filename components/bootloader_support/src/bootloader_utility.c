@@ -358,10 +358,28 @@ int bootloader_utility_get_selected_boot_partition(const bootloader_state_t *bs)
             ESP_LOGD(TAG, "Mapping seq %d -> OTA slot %d", ota_seq, boot_index);
 #ifdef CONFIG_APP_ROLLBACK_ENABLE
             if (otadata[active_otadata].ota_state == ESP_OTA_IMG_NEW) {
-                ESP_LOGD(TAG, "otadata[%d] is selected as new and marked PENDING_VERIFY state", active_otadata);
+                ESP_LOGI(TAG, "otadata[%d] is selected as new and marked PENDING_VERIFY state", active_otadata);
                 otadata[active_otadata].ota_state = ESP_OTA_IMG_PENDING_VERIFY;
                 write_otadata(&otadata[active_otadata], bs->ota_info.offset + FLASH_SECTOR_SIZE * active_otadata, write_encrypted);
+            } else if (otadata[active_otadata].ota_state == ESP_OTA_IMG_VALID) {
+#ifdef CONFIG_BOOTLOADER_OTA_NO_FORCE_ROLLBACK
+                /* Firmware image is valid, check if, passive partition should be completely erased */
+                int passive_otadata = !active_otadata;
+                if (otadata[passive_otadata].crc == bootloader_common_ota_select_crc(&otadata[passive_otadata])) {
+                    esp_partition_pos_t part;
+                    part = index_to_partition(bs, ((otadata[passive_otadata].ota_seq - 1) % bs->app_count));
+                    ESP_LOGW(TAG, "Deleting passive firmware @0x%x len:0x%x", part.offset, part.size);
+                    /* Delete contents of other partition and its entry from `otadata` */
+                    esp_err_t ret = bootloader_flash_erase_range(part.offset, part.size);
+                    if (ret != ESP_OK) {
+                        ESP_LOGE(TAG, "flash partition erase failed");
+                    }
+                    memset(&otadata[passive_otadata], 0xff, sizeof(esp_ota_select_entry_t));
+                    write_otadata(&otadata[passive_otadata], bs->ota_info.offset + FLASH_SECTOR_SIZE * passive_otadata, write_encrypted);
+                }
+#endif // CONFIG_BOOTLOADER_OTA_NO_FORCE_ROLLBACK
             }
+            ESP_LOGI(TAG, "ota rollback check done");
 #endif // CONFIG_APP_ROLLBACK_ENABLE
 
 #ifdef CONFIG_APP_ANTI_ROLLBACK
