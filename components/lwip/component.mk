@@ -1,6 +1,7 @@
 #
 # Component Makefile
 #
+ifdef CONFIG_TCPIP_LWIP
 COMPONENT_SUBMODULES += lwip
 
 COMPONENT_ADD_INCLUDEDIRS := \
@@ -38,3 +39,8 @@ lwip/src/netif/ppp/pppos.o: CFLAGS += -Wno-implicit-fallthrough
 endif
 
 COMPONENT_ADD_LDFRAGMENTS += linker.lf
+
+else
+COMPONENT_ADD_INCLUDEDIRS :=
+COMPONENT_SRCDIRS :=
+endif

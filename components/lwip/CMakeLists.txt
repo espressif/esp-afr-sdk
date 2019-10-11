@@ -1,3 +1,4 @@
+if(CONFIG_TCPIP_LWIP)
 set(COMPONENT_ADD_INCLUDEDIRS
     include/apps
     include/apps/sntp
@@ -122,6 +123,7 @@ if(CONFIG_PPP_SUPPORT)
                    "lwip/src/netif/ppp/polarssl/md5.c"
                    "lwip/src/netif/ppp/polarssl/sha1.c")
 endif()
+endif()
 
 set(COMPONENT_REQUIRES vfs)
 set(COMPONENT_PRIV_REQUIRES ethernet tcpip_adapter nvs_flash)
@@ -130,8 +132,10 @@ set(COMPONENT_ADD_LDFRAGMENTS linker.lf)
 
 register_component()
 
+if(CONFIG_TCPIP_LWIP)
 # lots of LWIP source files evaluate macros that check address of stack variables
 component_compile_options(-Wno-address)
+endif()
 
 if(GCC_NOT_5_2_0)
     set_source_files_properties(
