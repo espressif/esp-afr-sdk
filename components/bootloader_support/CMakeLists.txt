@@ -18,7 +18,14 @@ if(${BOOTLOADER_BUILD})
     set(COMPONENT_PRIV_REQUIRES spi_flash micro-ecc efuse)
     list(APPEND COMPONENT_SRCS "src/bootloader_init.c")
 
-    if(CONFIG_SECURE_SIGNED_APPS)
+else()
+    set(COMPONENT_ADD_INCLUDEDIRS "include")
+    set(COMPONENT_PRIV_INCLUDEDIRS "include_bootloader")
+    set(COMPONENT_REQUIRES)
+    set(COMPONENT_PRIV_REQUIRES spi_flash mbedtls micro-ecc efuse)
+endif()
+
+if(CONFIG_SECURE_SIGNED_APPS)
         get_filename_component(secure_boot_verification_key
             "signature_verification_key.bin"
             ABSOLUTE BASE_DIR "${CMAKE_BINARY_DIR}")
@@ -51,11 +58,5 @@ if(${BOOTLOADER_BUILD})
             APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES
             "${secure_boot_verification_key}")
     endif()
-else()
-    set(COMPONENT_ADD_INCLUDEDIRS "include")
-    set(COMPONENT_PRIV_INCLUDEDIRS "include_bootloader")
-    set(COMPONENT_REQUIRES)
-    set(COMPONENT_PRIV_REQUIRES spi_flash mbedtls micro-ecc efuse)
-endif()
 
 register_component()
