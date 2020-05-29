@@ -16,6 +16,16 @@ menu "LWIP"
             Please make sure you fully understand the impact of this feature before
             enabling it.
 
+    config ETHARP_SUPPORT_VLAN
+        bool "Support receiving and sending ethernet packets with VLAN header"
+        default n
+        help
+            ETHARP_SUPPORT_VLAN==1: support receiving and sending ethernet packets with
+            VLAN header. See the description of LWIP_HOOK_VLAN_CHECK and LWIP_HOOK_VLAN_SET
+            hooks to check/set VLAN headers.
+            If ETHARP_VLAN_CHECK is defined, only VLAN-traffic for this VLAN is accepted.
+            If ETHARP_VLAN_CHECK is not defined, all traffic is accepted.
+
     config LWIP_IRAM_OPTIMIZATION
         bool "Enable LWIP IRAM optimization"
         default n
@@ -36,6 +46,14 @@ menu "LWIP"
             sockets to be open at the same time conserves memory. Specify
             the maximum amount of sockets here. The valid value is from 1
             to 16.
+
+    config LWIP_RANDOMIZE_INITIAL_LOCAL_PORTS
+        bool "Randomize the local port for the first"
+        default y
+        help
+            LWIP_RANDOMIZE_INITIAL_LOCAL_PORTS==1: randomize the local port for the first
+            local TCP/UDP pcb (default==0). This can prevent creating predictable port
+            numbers after booting a device.
 
     config USE_ONLY_LWIP_SELECT
         bool "Support LWIP socket select() only"
@@ -76,7 +94,7 @@ menu "LWIP"
 
     config LWIP_IP_FRAG
         bool "Enable fragment outgoing IP packets"
-        default n
+        default y
         help
             Enabling this option allows fragmenting outgoing IP packets if their size
             exceeds MTU.
@@ -223,6 +241,14 @@ menu "LWIP"
             If rate limiting self-assignment requests, wait this long between
             each request.
 
+    config LWIP_IPV6_AUTOCONFIG
+        bool "Enable IPV6 stateless address autoconfiguration"
+        default n
+        help
+            Enabling this option allows the devices to IPV6 stateless address autoconfiguration.
+
+            See RFC 4862.
+
     menuconfig LWIP_NETIF_LOOPBACK
         bool "Support per-interface loopback"
         default y
@@ -302,7 +328,8 @@ menu "LWIP"
         config TCP_SND_BUF_DEFAULT
             int "Default send buffer size"
             default 5744  # 4 * default MSS
-            range 2440 65535
+            range 2440 65535 if !LWIP_WND_SCALE
+            range 2440 1024000 if LWIP_WND_SCALE
             help
                 Set default send buffer size for new TCP sockets.
 
@@ -318,7 +345,8 @@ menu "LWIP"
         config TCP_WND_DEFAULT
             int "Default receive window size"
             default 5744 # 4 * default MSS
-            range 2440 65535
+            range 2440 65535 if !LWIP_WND_SCALE
+            range 2440 1024000 if LWIP_WND_SCALE
             help
                 Set default TCP receive window size for new TCP sockets.
 
@@ -572,5 +600,12 @@ menu "LWIP"
                 (SNTPv4 RFC 4330 enforces a minimum update time of 15 seconds).
 
     endmenu # SNTP
+
+    config LWIP_ESP_LWIP_ASSERT
+        bool "Enable LWIP ASSERT checks"
+        default y
+        help
+            Enable this option allows lwip to check assert.
+            It is recommended to keep it open, do not close it.
 
 endmenu

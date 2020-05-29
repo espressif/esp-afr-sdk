@@ -110,7 +110,7 @@ static poison_head_t *verify_allocated_region(void *data, bool print_errors)
     }
     if (canary != TAIL_CANARY_PATTERN) {
         if (print_errors) {
-            printf("CORRUPT HEAP: Bad tail at %p. Expected 0x%08x got 0x%08x\n", &tail->tail_canary,
+            MULTI_HEAP_STDERR_PRINTF("CORRUPT HEAP: Bad tail at %p. Expected 0x%08x got 0x%08x\n", &tail->tail_canary,
                    TAIL_CANARY_PATTERN, canary);
         }
         return NULL;
@@ -184,6 +184,10 @@ static bool verify_fill_pattern(void *data, size_t size, bool print_errors, bool
 
 void *multi_heap_malloc(multi_heap_handle_t heap, size_t size)
 {
+    if (!size) {
+        return NULL;
+    }
+
     if(size > SIZE_MAX - POISON_OVERHEAD) {
         return NULL;
     }
@@ -302,9 +306,11 @@ void *multi_heap_get_block_owner(multi_heap_block_handle_t block)
 
 multi_heap_handle_t multi_heap_register(void *start, size_t size)
 {
+#ifdef SLOW
     if (start != NULL) {
         memset(start, FREE_FILL_PATTERN, size);
     }
+#endif
     return multi_heap_register_impl(start, size);
 }
 

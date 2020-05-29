@@ -36,7 +36,8 @@ static const char* TIMER_TAG = "timer_group";
 #define TIMER_SCALE_ERROR       "HW TIMER SCALE ERROR"
 #define TIMER_ALARM_ERROR       "HW TIMER ALARM ERROR"
 #define DIVIDER_RANGE_ERROR     "HW TIMER divider outside of [2, 65536] range error"
-static timg_dev_t *TG[2] = {&TIMERG0, &TIMERG1};
+/* DRAM_ATTR is required to avoid TG array placed in flash, due to accessed from ISR */
+static DRAM_ATTR timg_dev_t *TG[2] = {&TIMERG0, &TIMERG1};
 static portMUX_TYPE timer_spinlock[TIMER_GROUP_MAX] = {portMUX_INITIALIZER_UNLOCKED, portMUX_INITIALIZER_UNLOCKED};
 
 #define TIMER_ENTER_CRITICAL(mux)      portENTER_CRITICAL_SAFE(mux);
@@ -258,7 +259,12 @@ esp_err_t timer_group_intr_enable(timer_group_t group_num, uint32_t en_mask)
 {
     TIMER_CHECK(group_num < TIMER_GROUP_MAX, TIMER_GROUP_NUM_ERROR, ESP_ERR_INVALID_ARG);
     portENTER_CRITICAL(&timer_spinlock[group_num]);
-    TG[group_num]->int_ena.val |= en_mask;
+    for (int i = 0; i < 2; i++) {
+        if (en_mask & (1 << i)) {
+            TG[group_num]->hw_timer[i].config.level_int_en = 1;
+            TG[group_num]->int_ena.val |= (1 << i);
+        }
+    }
     portEXIT_CRITICAL(&timer_spinlock[group_num]);
     return ESP_OK;
 }
@@ -267,7 +273,12 @@ esp_err_t timer_group_intr_disable(timer_group_t group_num, uint32_t disable_mas
 {
     TIMER_CHECK(group_num < TIMER_GROUP_MAX, TIMER_GROUP_NUM_ERROR, ESP_ERR_INVALID_ARG);
     portENTER_CRITICAL(&timer_spinlock[group_num]);
-    TG[group_num]->int_ena.val &= (~disable_mask);
+    for (int i = 0; i < 2; i++) {
+        if (disable_mask & (1 << i)) {
+            TG[group_num]->hw_timer[i].config.level_int_en = 0;
+            TG[group_num]->int_ena.val &= ~(1 << i);
+        }
+    }
     portEXIT_CRITICAL(&timer_spinlock[group_num]);
     return ESP_OK;
 }
@@ -276,14 +287,22 @@ esp_err_t timer_enable_intr(timer_group_t group_num, timer_idx_t timer_num)
 {
     TIMER_CHECK(group_num < TIMER_GROUP_MAX, TIMER_GROUP_NUM_ERROR, ESP_ERR_INVALID_ARG);
     TIMER_CHECK(timer_num < TIMER_MAX, TIMER_NUM_ERROR, ESP_ERR_INVALID_ARG);
-    return timer_group_intr_enable(group_num, BIT(timer_num));
+    portENTER_CRITICAL(&timer_spinlock[group_num]);
+    TG[group_num]->hw_timer[timer_num].config.level_int_en = 1;
+    TG[group_num]->int_ena.val |= (1 << timer_num);
+    portEXIT_CRITICAL(&timer_spinlock[group_num]);
+    return ESP_OK;
 }
 
 esp_err_t timer_disable_intr(timer_group_t group_num, timer_idx_t timer_num)
 {
     TIMER_CHECK(group_num < TIMER_GROUP_MAX, TIMER_GROUP_NUM_ERROR, ESP_ERR_INVALID_ARG);
     TIMER_CHECK(timer_num < TIMER_MAX, TIMER_NUM_ERROR, ESP_ERR_INVALID_ARG);
-    return timer_group_intr_disable(group_num, BIT(timer_num));
+    portENTER_CRITICAL(&timer_spinlock[group_num]);
+    TG[group_num]->hw_timer[timer_num].config.level_int_en = 0;
+    TG[group_num]->int_ena.val &= ~(1 << timer_num);
+    portEXIT_CRITICAL(&timer_spinlock[group_num]);
+    return ESP_OK;
 }
 
 

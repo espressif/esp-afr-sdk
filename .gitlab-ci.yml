@@ -53,6 +53,11 @@ variables:
 .apply_bot_filter: &apply_bot_filter
   python $APPLY_BOT_FILTER_SCRIPT || exit 0
 
+.setup_tools_unless_target_test: &setup_tools_unless_target_test |
+  if [[ "$SETUP_TOOLS" == "1" || "$CI_JOB_STAGE" != "target_test" ]]; then
+  tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)" || exit 1
+  fi
+
 before_script:
   - source tools/ci/setup_python.sh
   - *git_clean_stale_submodules
@@ -65,6 +70,8 @@ before_script:
   - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 > ~/.ssh/id_rsa
   - chmod 600 ~/.ssh/id_rsa
   - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+  # Download and install tools, if needed
+  - *setup_tools_unless_target_test
 
   # Set IS_PRIVATE or IS_PUBLIC depending on if our branch is public or not
   #
@@ -122,11 +129,11 @@ build_template_app:
     # Set the variable for 'esp-idf-template' testing
     - ESP_IDF_TEMPLATE_GIT=${ESP_IDF_TEMPLATE_GIT:-"https://github.com/espressif/esp-idf-template.git"}
     - git clone ${ESP_IDF_TEMPLATE_GIT}
-    - cd esp-idf-template
     # Try to use the same branch name for esp-idf-template that we're
     # using on esp-idf. If it doesn't exist then just stick to the default
     # branch
-    - python $CHECKOUT_REF_SCRIPT esp-idf-template
+    - python $CHECKOUT_REF_SCRIPT esp-idf-template esp-idf-template
+    - cd esp-idf-template
     - make defconfig
     # Test debug build (default)
     - make all V=1
@@ -166,8 +173,8 @@ build_ssc:
       - $BOT_LABEL_REGULAR_TEST
   script:
     - git clone $SSC_REPOSITORY
+    - python $CHECKOUT_REF_SCRIPT SSC SSC
     - cd SSC
-    - python $CHECKOUT_REF_SCRIPT SSC
     - MAKEFLAGS= ./ci_build_ssc.sh
 
 .build_esp_idf_unit_test_template: &build_esp_idf_unit_test_template
@@ -176,7 +183,7 @@ build_ssc:
     paths:
       - tools/unit-test-app/output
       - components/idf_test/unit_test/TestCaseAll.yml
-    expire_in: 2 days
+    expire_in: 4 days
   only:
     variables:
       - $BOT_TRIGGER_WITH_LABEL == null
@@ -230,7 +237,7 @@ build_examples_make:
       - build_examples/*/*/*/build/download.config
       - build_examples/*/*/*/build/bootloader/*.bin
       - $LOG_PATH
-    expire_in: 2 days
+    expire_in: 4 days
   variables:
     LOG_PATH: "$CI_PROJECT_DIR/log_examples_make"
   only:
@@ -264,7 +271,7 @@ build_examples_cmake:
       - build_examples_cmake/*/*/*/build/flasher_args.json
       - build_examples_cmake/*/*/*/build/bootloader/*.bin
       - $LOG_PATH
-    expire_in: 2 days
+    expire_in: 4 days
   variables:
     LOG_PATH: "$CI_PROJECT_DIR/log_examples_cmake"
   only:
@@ -303,7 +310,7 @@ build_docs:
       - docs/zh_CN/sphinx-warning-log.txt
       - docs/zh_CN/sphinx-warning-log-sanitized.txt
       - docs/zh_CN/_build/html
-    expire_in: 1 day
+    expire_in: 4 days
   only:
     variables:
       - $BOT_TRIGGER_WITH_LABEL == null
@@ -340,6 +347,29 @@ verify_cmake_style:
       - $BOT_LABEL_REGULAR_TEST
   script:
     tools/cmake/run_cmake_lint.sh
+
+build_docker:
+  stage: build
+  image: espressif/docker-builder:1
+  tags:
+    - build_docker_amd64_brno
+  only:
+    refs:
+      - master
+      - /^release\/v/
+      - /^v\d+\.\d+(\.\d+)?($|-)/
+      - schedules
+  variables:
+    DOCKER_TMP_IMAGE_NAME: "idf_tmp_image"
+  before_script: []
+  script:
+    - export DOCKER_BUILD_ARGS="--build-arg IDF_CLONE_URL=${CI_REPOSITORY_URL} --build-arg IDF_CLONE_BRANCH_OR_TAG=${CI_COMMIT_REF_NAME} --build-arg IDF_CHECKOUT_REF=${CI_COMMIT_TAG:-$CI_COMMIT_SHA}"
+    # Build
+    - docker build --tag ${DOCKER_TMP_IMAGE_NAME} ${DOCKER_BUILD_ARGS} tools/docker/
+    # We can't mount $PWD/examples/get-started/blink into the container, see https://gitlab.com/gitlab-org/gitlab-ce/issues/41227.
+    # The workaround mentioned there works, but leaves around directories which need to be cleaned up manually.
+    # Therefore, build a copy of the example located inside the container.
+    - docker run --rm --workdir /opt/esp/idf/examples/get-started/blink ${DOCKER_TMP_IMAGE_NAME} idf.py build
 
 .host_test_template: &host_test_template
   stage: host_test
@@ -567,9 +597,12 @@ push_to_github:
   tags:
     - deploy
   only:
-    - master
-    - /^release\/v/
-    - /^v\d+\.\d+(\.\d+)?($|-)/
+    refs:
+      - master
+      - /^release\/v/
+      - /^v\d+\.\d+(\.\d+)?($|-)/
+    variables:
+      - $BOT_TRIGGER_WITH_LABEL == null
   when: on_success
   dependencies: []
   before_script: *do_nothing_before
@@ -589,6 +622,7 @@ deploy_docs:
   image: $CI_DOCKER_REGISTRY/esp32-ci-env$BOT_DOCKER_IMAGE_TAG
   tags:
     - deploy
+    - shiny
   only:
     refs:
       - master
@@ -664,6 +698,18 @@ check_permissions:
   <<: *check_job_template
   script:
     - tools/ci/check-executable.sh
+
+check_version:
+  <<: *check_job_template
+  # Don't run this for feature/bugfix branches, so that it is possible to modify
+  # esp_idf_version.h in a branch before tagging the next version.
+  only:
+    - master
+    - /^release\/v/
+    - /^v\d+\.\d+(\.\d+)?($|-)/
+  script:
+    - export IDF_PATH=$PWD
+    - tools/ci/check_idf_version.sh
 
 check_examples_cmake_make:
   <<: *check_job_template
@@ -779,8 +825,8 @@ assign_test:
     - python $TEST_FW_PATH/CIAssignUnitTest.py $IDF_PATH/components/idf_test/unit_test/TestCaseAll.yml $IDF_PATH/.gitlab-ci.yml $IDF_PATH/components/idf_test/unit_test/CIConfigs
     # clone test script to assign tests
     - git clone $TEST_SCRIPT_REPOSITORY
+    - python $CHECKOUT_REF_SCRIPT auto_test_script auto_test_script
     - cd auto_test_script
-    - python $CHECKOUT_REF_SCRIPT auto_test_script
     # assgin integration test cases
     - python CIAssignTestCases.py -t $IDF_PATH/components/idf_test/integration_test -c $IDF_PATH/.gitlab-ci.yml -b $IDF_PATH/SSC/ssc_bin
 
@@ -825,8 +871,7 @@ assign_test:
     - test -e $CONFIG_FILE || exit 0
     # clone test env configs
     - git clone $TEST_ENV_CONFIG_REPOSITORY
-    - cd ci-test-runner-configs
-    - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs
+    - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
     - cd $TEST_FW_PATH
     # run test
     - python Runner.py $TEST_CASE_PATH -c $CONFIG_FILE -e $ENV_FILE
@@ -889,12 +934,12 @@ assign_test:
     - test -e $CONFIG_FILE || exit 0
     # clone local test env configs
     - git clone $TEST_ENV_CONFIG_REPOSITORY
+    - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
     - cd ci-test-runner-configs
-    - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs
     # clone test bench
     - git clone $TEST_SCRIPT_REPOSITORY
+    - python $CHECKOUT_REF_SCRIPT auto_test_script auto_test_script
     - cd auto_test_script
-    - python $CHECKOUT_REF_SCRIPT auto_test_script
     # run test
     - python CIRunner.py -l "$LOG_PATH/$JOG_FULL_NAME" -c $CONFIG_FILE -e $LOCAL_ENV_CONFIG_PATH -t $TEST_CASE_FILE_PATH
 
@@ -915,12 +960,12 @@ nvs_compatible_test:
     - test -e $CONFIG_FILE || exit 0
     # clone local test env configs
     - git clone $TEST_ENV_CONFIG_REPOSITORY
+    - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
     - cd ci-test-runner-configs
-    - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs
     # clone test bench
     - git clone $TEST_SCRIPT_REPOSITORY
+    - python $CHECKOUT_REF_SCRIPT auto_test_script auto_test_script
     - cd auto_test_script
-    - git checkout ${CI_COMMIT_REF_NAME} || echo "Using default branch..."
     # prepare nvs bins
     - ./Tools/prepare_nvs_bin.sh
     # run test
@@ -928,7 +973,7 @@ nvs_compatible_test:
 
 example_test_001:
   <<: *example_test_template
-  parallel: 2
+  parallel: 3
   tags:
     - ESP32
     - Example_WIFI
@@ -946,11 +991,17 @@ example_test_002:
     - ESP32
     - Example_SDIO
 
-example_test_004:
+example_test_004A:
   <<: *example_test_template
   tags:
     - ESP32
-    - Example_CAN
+    - Example_CAN1
+
+example_test_004B:
+  <<: *example_test_template
+  tags:
+    - ESP32
+    - Example_CAN2
 
 example_test_005:
   <<: *example_test_template
@@ -1192,6 +1243,71 @@ UT_031:
   tags:
     - ESP32_IDF
     - UT_T1_1
+
+UT_032:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_1
+    - psram
+
+UT_033:
+  extends: .unit_test_template
+  parallel: 2
+  tags:
+    - ESP32_IDF
+    - UT_T1_PSRAMV0
+    - psram
+
+UT_034:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_no32kXTAL
+
+UT_035:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_no32kXTAL
+
+UT_036:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_no32kXTAL
+
+UT_037:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_no32kXTAL
+    - psram
+
+UT_038:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_32kXTAL
+
+UT_039:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_32kXTAL
+
+UT_040:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_32kXTAL
+
+UT_041:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_32kXTAL
+    - psram
 
 IT_001:
   <<: *test_template
