@@ -8,7 +8,10 @@ Flash Encryption is separate from the :doc:`Secure Boot <secure-boot>` feature, 
 When using any non-default configuration in production, additional steps may also be needed to ensure effectiveness of flash encryption. See :ref:`securing-flash-encryption` for more details.
 
 .. important::
-  Enabling flash encryption limits your options for further updates of your ESP32. Make sure to read this document (including :ref:`flash-encryption-limitations`) and understand the implications of enabling flash encryption.
+    Enabling flash encryption limits your options for further updates of your ESP32. Make sure to read this document (including :ref:`flash-encryption-limitations`) and understand the implications of enabling flash encryption.
+
+.. note::
+    Flash encryption is only supported when using the default GNU Make build system. The CMake build system preview in ESP-IDF v3.x does not support flash encryption.
 
 Background
 ----------
@@ -323,8 +326,8 @@ A third option with more flexibility: the app can call :func:`esp_flash_write_pr
 
 .. _flash-encryption-advanced-features:
 
-Flash Encryption Advanced Features
-----------------------------------
+Advanced Features
+-----------------
 
 The following information is useful for advanced use of flash encryption:
 
@@ -390,6 +393,12 @@ It is possible to write these efuse manually, and write protect it before first 
 
 It is strongly recommended to never write protect ``FLASH_CRYPT_CONFIG`` when it the value is zero. If this efuse is set to zero, no bits in the flash encryption key are tweaked and the flash encryption algorithm is equivalent to AES ECB mode.
 
+JTAG Debugging
+^^^^^^^^^^^^^^
+
+By default, when Flash Encryption is enabled then JTAG debugging is disabled via eFuse. The bootloader does this on first boot, at the same time it enables flash encryption.
+
+See :ref:`jtag-debugging-security-features` for more information about using JTAG Debugging with Flash Encryption.
 
 Technical Details
 -----------------

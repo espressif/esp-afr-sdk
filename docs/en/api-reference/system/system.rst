@@ -104,10 +104,27 @@ Chip version
 
 :cpp:func:`esp_chip_info` function fills :cpp:class:`esp_chip_info_t` structure with information about the chip. This includes the chip revision, number of CPU cores, and a bit mask of features enabled in the chip.
 
+.. _idf-version-h:
+
 SDK version
 -----------
 
 :cpp:func:`esp_get_idf_version` returns a string describing the IDF version which was used to compile the application. This is the same value as the one available through ``IDF_VER`` variable of the build system. The version string generally has the format of ``git describe`` output.
+
+To get the version at build time, additional version macros are provided. They can be used to enable or disable parts of the program depending on IDF version.
+
+* :c:macro:`ESP_IDF_VERSION_MAJOR`, :c:macro:`ESP_IDF_VERSION_MINOR`, :c:macro:`ESP_IDF_VERSION_PATCH` are defined to integers representing major, minor, and patch version.
+
+* :c:macro:`ESP_IDF_VERSION_VAL` and :c:macro:`ESP_IDF_VERSION` can be used when implementing version checks:
+  
+  .. code-block:: c
+
+      #include "esp_idf_version.h"
+
+      #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 0, 0)
+          // enable functionality present in IDF v4.0
+      #endif
+
 
 App version
 -----------
@@ -125,5 +142,6 @@ API Reference
 -------------
 
 .. include:: /_build/inc/esp_system.inc
+.. include:: /_build/inc/esp_idf_version.inc
 
 

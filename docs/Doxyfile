@@ -55,6 +55,20 @@ INPUT = \
     ../../components/bt/bluedroid/api/include/api/esp_hf_client_api.h \
      ## NimBLE related Bluetooth APIs
     ../../components/nimble/esp-hci/include/esp_nimble_hci.h \
+    ## ESP BLE Mesh APIs
+    ../../components/bt/esp_ble_mesh/api/core/include/esp_ble_mesh_common_api.h \
+    ../../components/bt/esp_ble_mesh/api/core/include/esp_ble_mesh_local_data_operation_api.h \
+    ../../components/bt/esp_ble_mesh/api/core/include/esp_ble_mesh_low_power_api.h \
+    ../../components/bt/esp_ble_mesh/api/core/include/esp_ble_mesh_networking_api.h \
+    ../../components/bt/esp_ble_mesh/api/core/include/esp_ble_mesh_provisioning_api.h \
+    ../../components/bt/esp_ble_mesh/api/core/include/esp_ble_mesh_proxy_api.h \
+    ../../components/bt/esp_ble_mesh/api/models/include/esp_ble_mesh_config_model_api.h \
+    ../../components/bt/esp_ble_mesh/api/models/include/esp_ble_mesh_generic_model_api.h \
+    ../../components/bt/esp_ble_mesh/api/models/include/esp_ble_mesh_health_model_api.h \
+    ../../components/bt/esp_ble_mesh/api/models/include/esp_ble_mesh_lighting_model_api.h \
+    ../../components/bt/esp_ble_mesh/api/models/include/esp_ble_mesh_sensor_model_api.h \
+    ../../components/bt/esp_ble_mesh/api/models/include/esp_ble_mesh_time_scene_model_api.h \
+    ../../components/bt/esp_ble_mesh/api/esp_ble_mesh_defs.h \
     ##
     ## Ethernet - API Reference
     ##
@@ -104,6 +118,8 @@ INPUT = \
     ../../components/esp_http_client/include/esp_http_client.h \
     ../../components/esp_http_server/include/esp_http_server.h \
     ../../components/esp_https_server/include/esp_https_server.h \
+    ## Websocket Client
+    ../../components/esp_websocket_client/include/esp_websocket_client.h \
     ##
     ## Provisioning - API Reference
     ##
@@ -181,6 +197,8 @@ INPUT = \
     ## Base MAC address
     ## NOTE: for line below header_file.inc is not used
     ../../components/esp32/include/esp_system.h \
+    ## IDF version
+    ../../components/esp32/include/esp_idf_version.h \
     ##
     ## ULP Coprocessor - API Guides
     ##
@@ -238,7 +256,8 @@ PREDEFINED             = \
     configTHREAD_LOCAL_STORAGE_DELETE_CALLBACKS=1 \
     configNUM_THREAD_LOCAL_STORAGE_POINTERS=1 \
     configUSE_APPLICATION_TASK_TAG=1 \
-    configTASKLIST_INCLUDE_COREID=1
+    configTASKLIST_INCLUDE_COREID=1 \
+    "ESP_EVENT_DECLARE_BASE(x)=extern esp_event_base_t x"
 
 ## Do not complain about not having dot
 ##
