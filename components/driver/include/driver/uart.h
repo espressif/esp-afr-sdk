@@ -143,6 +143,7 @@ typedef enum {
     UART_PARITY_ERR,        /*!< UART RX parity event*/
     UART_DATA_BREAK,        /*!< UART TX data and break event*/
     UART_PATTERN_DET,       /*!< UART pattern detected */
+    UART_TX_DONE,           /*!< UART TX transaction done event */
     UART_EVENT_MAX,         /*!< UART event max index*/
 } uart_event_type_t;
 
@@ -155,6 +156,8 @@ typedef struct {
 } uart_event_t;
 
 typedef intr_handle_t uart_isr_handle_t;
+
+typedef void(*uart_isr_cb_t)(uart_event_t, void *param);
 
 /**
  * @brief Set UART data bits.
@@ -424,6 +427,33 @@ esp_err_t uart_isr_register(uart_port_t uart_num, void (*fn)(void*), void * arg,
  *     - ESP_FAIL Parameter error
  */
 esp_err_t uart_isr_free(uart_port_t uart_num);
+
+/**
+ * @brief Set UART callback function.
+ *
+ * @note The callback is executed from interrupt context.
+ *       Hence callback should be of short duration and placed in IRAM.
+ *
+ * @param uart_num UART_NUM_0, UART_NUM_1 or UART_NUM_2
+ * @param uart_isr_cb  callback function.
+ * @param param parameter for callback function
+ *
+ * @return
+ *     - ESP_OK   Success
+ *     - ESP_FAIL Parameter error
+ */
+esp_err_t uart_register_callback_with_isr(uart_port_t uart_num, uart_isr_cb_t uart_isr_cb, void *param);
+
+/**
+ * @brief Remove UART callback function.
+ *
+ * @param uart_num UART_NUM_0, UART_NUM_1 or UART_NUM_2
+ *
+ * @return
+ *     - ESP_OK   Success
+ *     - ESP_FAIL Parameter error
+ */
+esp_err_t uart_deregister_callback_with_isr(uart_port_t uart_num);
 
 /**
  * @brief Set UART pin number
