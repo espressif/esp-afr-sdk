@@ -283,9 +283,9 @@ esp_err_t rtc_gpio_pullup_en(gpio_num_t gpio_num)
     }
 
     //this is a rtc pad
-    portENTER_CRITICAL(&rtc_spinlock);
+    portENTER_CRITICAL_SAFE(&rtc_spinlock);
     SET_PERI_REG_MASK(rtc_gpio_desc[gpio_num].reg, rtc_gpio_desc[gpio_num].pullup);
-    portEXIT_CRITICAL(&rtc_spinlock);
+    portEXIT_CRITICAL_SAFE(&rtc_spinlock);
 
     return ESP_OK;
 }
@@ -328,9 +328,9 @@ esp_err_t rtc_gpio_pulldown_dis(gpio_num_t gpio_num)
     }
 
     //this is a rtc pad
-    portENTER_CRITICAL(&rtc_spinlock);
+    portENTER_CRITICAL_SAFE(&rtc_spinlock);
     CLEAR_PERI_REG_MASK(rtc_gpio_desc[gpio_num].reg, rtc_gpio_desc[gpio_num].pulldown);
-    portEXIT_CRITICAL(&rtc_spinlock);
+    portEXIT_CRITICAL_SAFE(&rtc_spinlock);
 
     return ESP_OK;
 }
