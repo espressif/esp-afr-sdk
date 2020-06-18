@@ -38,7 +38,15 @@ extern "C" {
 #define I2C_NUM_1              (1) /*!< I2C port 1 */
 #define I2C_NUM_MAX            (SOC_I2C_NUM) /*!< I2C port max */
 
+typedef enum {
+    I2C_TRANS_STATUS_DONE,
+    I2C_TRANS_STATUS_ERR,
+} i2c_trans_status_t;
+
 typedef void *i2c_cmd_handle_t;    /*!< I2C command handle  */
+
+typedef void(*i2c_transaction_cb_t)(i2c_trans_status_t, void *arg);
+
 
 /**
  * @brief I2C driver install
@@ -299,6 +307,51 @@ esp_err_t i2c_master_stop(i2c_cmd_handle_t cmd_handle);
  *     - ESP_ERR_TIMEOUT Operation timeout because the bus is busy.
  */
 esp_err_t i2c_master_cmd_begin(i2c_port_t i2c_num, i2c_cmd_handle_t cmd_handle, TickType_t ticks_to_wait);
+
+/**
+ * @brief I2C master send queued commands. Transaction will happen in ISR context.
+ *        This function will return after trigger sending all queued command.
+ *        Task will not be blocked.
+ *        @note This API is not thread safe, if you want to use i2c_master_cmd_begin_async() in different tasks,
+ *        you need to take care of the multi-thread issue.
+ *
+ * @param i2c_num I2C port number
+ * @param cmd_handle I2C command handler
+ *
+ * @return
+ *     - ESP_OK Success
+ *     - ESP_ERR_INVALID_ARG Parameter error
+ *     - ESP_ERR_INVALID_STATE I2C driver not installed or not in master mode
+ */
+esp_err_t i2c_master_cmd_begin_async(i2c_port_t i2c_num, i2c_cmd_handle_t cmd_handle);
+
+/**
+ * @brief Set callback to be called after execution
+ *        @note Callback should only be set when using i2c_master_cmd_begin_async() API
+ *
+ * @param i2c_num I2C port number
+ * @param cb Callback function
+ * @param user User data
+ *
+ * @return
+ *     - ESP_OK Success
+ *     - ESP_ERR_INVALID_ARG Parameter error
+ *     - ESP_ERR_INVALID_STATE I2C driver not installed or not in master mode
+ */
+esp_err_t i2c_master_register_callback_with_isr(i2c_port_t i2c_num, i2c_transaction_cb_t cb, void *user);
+
+/**
+ * @brief Deregister I2C callback
+ *
+ * @param i2c_num I2C port number
+ *
+ * @return
+ *     - ESP_OK Success
+ *     - ESP_ERR_INVALID_ARG Parameter error
+ *     - ESP_ERR_INVALID_STATE I2C driver not installed or not in master mode
+ */
+esp_err_t i2c_master_deregister_callback_with_isr(i2c_port_t i2c_num);
+
 
 /**
  * @brief I2C slave write data to internal ringbuffer, when tx fifo empty, isr will fill the hardware
