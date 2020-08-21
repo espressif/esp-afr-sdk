@@ -114,7 +114,7 @@ static void panicPutHex(int a) { }
 static void panicPutDec(int a) { }
 #endif
 
-void  __attribute__((weak)) vApplicationStackOverflowHook( TaskHandle_t xTask, signed char *pcTaskName )
+void  __attribute__((weak)) vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
 {
     panicPutStr("***ERROR*** A stack overflow in task ");
     panicPutStr((char *)pcTaskName);
