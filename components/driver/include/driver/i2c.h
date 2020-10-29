@@ -104,7 +104,7 @@ typedef struct{
 }i2c_config_t;
 
 typedef void* i2c_cmd_handle_t;    /*!< I2C command handle  */
-typedef void(*transaction_cb_t)(i2c_trans_status_t, void *arg);
+typedef void(*i2c_transaction_cb_t)(i2c_trans_status_t, void *arg);
 
 /**
  * @brief I2C driver install
@@ -396,7 +396,7 @@ esp_err_t i2c_master_cmd_begin_async(i2c_port_t i2c_num, i2c_cmd_handle_t cmd_ha
  *     - ESP_ERR_INVALID_ARG Parameter error
  *     - ESP_ERR_INVALID_STATE I2C driver not installed or not in master mode
  */
-esp_err_t i2c_master_register_callback_with_isr(i2c_port_t i2c_num, transaction_cb_t cb, void *user);
+esp_err_t i2c_master_register_callback_with_isr(i2c_port_t i2c_num, i2c_transaction_cb_t cb, void *user);
 
 /**
  * @brief Deregister I2C callback

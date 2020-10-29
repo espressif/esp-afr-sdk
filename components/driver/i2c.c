@@ -151,7 +151,7 @@ typedef struct {
     RingbufHandle_t rx_ring_buf;     /*!< rx ringbuffer handler of slave mode */
     size_t tx_buf_length;            /*!< tx buffer length */
     RingbufHandle_t tx_ring_buf;     /*!< tx ringbuffer handler of slave mode */
-    transaction_cb_t i2c_isr_cb;     /*!< callback function */
+    i2c_transaction_cb_t i2c_isr_cb; /*!< callback function */
     void *user_ctx;                  /*!< user data */
 } i2c_obj_t;
 
@@ -1327,7 +1327,7 @@ esp_err_t i2c_master_cmd_begin_async(i2c_port_t i2c_num, i2c_cmd_handle_t cmd_ha
     return ESP_OK;
 }
 
-esp_err_t i2c_master_register_callback_with_isr(i2c_port_t i2c_num, transaction_cb_t cb, void *user_ctx)
+esp_err_t i2c_master_register_callback_with_isr(i2c_port_t i2c_num, i2c_transaction_cb_t cb, void *user_ctx)
 {
     I2C_CHECK(( i2c_num < I2C_NUM_MAX ), I2C_NUM_ERROR_STR, ESP_ERR_INVALID_ARG);
     I2C_CHECK(p_i2c_obj[i2c_num] != NULL, I2C_DRIVER_NOT_INSTALL_ERR_STR, ESP_ERR_INVALID_STATE);
