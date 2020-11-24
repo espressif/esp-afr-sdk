@@ -9,45 +9,10 @@ extern "C" {
 #endif
 
 typedef enum {
-    ADC_DIGI_FORMAT_12BIT,   /*!< ADC to I2S data format, [15:12]-channel [11:0]-12 bits ADC data.
-                                 Note: In single convert mode. */
-    ADC_DIGI_FORMAT_11BIT,   /*!< ADC to I2S data format, [15]-adc unit [14:11]-channel [10:0]-11 bits ADC data.
-                                 Note: In multi convert mode. */
-    ADC_DIGI_FORMAT_MAX,
-} adc_hal_digi_output_format_t;
-
-typedef enum {
-    ADC_CONV_SINGLE_UNIT_1 = 1, /*!< SAR ADC 1*/
-    ADC_CONV_SINGLE_UNIT_2 = 2, /*!< SAR ADC 2, not supported yet*/
-    ADC_CONV_BOTH_UNIT     = 3, /*!< SAR ADC 1 and 2, not supported yet */
-    ADC_CONV_ALTER_UNIT    = 7, /*!< SAR ADC 1 and 2 alternative mode, not supported yet */
-    ADC_CONV_UNIT_MAX,
-} adc_hal_digi_convert_mode_t;
-
-typedef enum {
     ADC_NUM_1 = 0,          /*!< SAR ADC 1 */
     ADC_NUM_2 = 1,          /*!< SAR ADC 2 */
     ADC_NUM_MAX,
 } adc_ll_num_t;
-
-typedef struct {
-    union {
-        struct {
-            uint8_t atten:     2;   /*!< ADC sampling voltage attenuation configuration.
-                                         0: input voltage * 1;
-                                         1: input voltage * 1/1.34;
-                                         2: input voltage * 1/2;
-                                         3: input voltage * 1/3.6. */
-            uint8_t bit_width: 2;   /*!< ADC resolution.
-                                         0: 9 bit;
-                                         1: 10 bit;
-                                         2: 11 bit;
-                                         3: 12 bit. */
-            uint8_t channel:   4;   /*!< ADC channel index. */
-        };
-        uint8_t val;
-    };
-} adc_hal_digi_pattern_table_t;
 
 typedef enum {
     ADC_POWER_BY_FSM,   /*!< ADC XPD controlled by FSM. Used for polling mode */
@@ -94,13 +59,12 @@ static inline void adc_ll_digi_set_fsm_time(uint32_t rst_wait, uint32_t start_wa
 }
 
 /**
- * Set adc sample cycle for digital controller.
+ * Set adc sample cycle.
  *
  * @note Normally, please use default value.
- * @param sample_cycle Cycles between DIG ADC controller start ADC sensor and beginning to receive data from sensor.
- *                     Range: 2 ~ 0xFF.
+ * @param sample_cycle The number of ADC sampling cycles. Range: 1 ~ 7.
  */
-static inline void adc_ll_digi_set_sample_cycle(uint32_t sample_cycle)
+static inline void adc_ll_set_sample_cycle(uint32_t sample_cycle)
 {
     SYSCON.saradc_fsm.sample_cycle = sample_cycle;
 }
@@ -119,9 +83,9 @@ static inline void adc_ll_digi_set_clk_div(uint32_t div)
 /**
  * Set adc output data format for digital controller.
  *
- * @param format Output data format, see ``adc_hal_digi_output_format_t``.
+ * @param format Output data format, see ``adc_digi_output_format_t``.
  */
-static inline void adc_ll_digi_set_output_format(adc_hal_digi_output_format_t format)
+static inline void adc_ll_digi_set_output_format(adc_digi_output_format_t format)
 {
     SYSCON.saradc_ctrl.data_sar_sel = format;
 }
@@ -160,9 +124,9 @@ static inline void adc_ll_digi_convert_limit_disable(void)
  *
  * @note ESP32 only support ADC1 single mode.
  *
- * @param mode Conversion mode select, see ``adc_hal_digi_convert_mode_t``.
+ * @param mode Conversion mode select, see ``adc_digi_convert_mode_t``.
  */
-static inline void adc_ll_digi_set_convert_mode(adc_hal_digi_convert_mode_t mode)
+static inline void adc_ll_digi_set_convert_mode(adc_digi_convert_mode_t mode)
 {
     if (mode == ADC_CONV_SINGLE_UNIT_1) {
         SYSCON.saradc_ctrl.work_mode = 0;
@@ -228,9 +192,9 @@ static inline void adc_ll_digi_set_pattern_table_len(adc_ll_num_t adc_n, uint32_
  *
  * @param adc_n ADC unit.
  * @param pattern_index Items index. Range: 0 ~ 15.
- * @param pattern Stored conversion rules, see ``adc_hal_digi_pattern_table_t``.
+ * @param pattern Stored conversion rules, see ``adc_digi_pattern_table_t``.
  */
-static inline void adc_ll_digi_set_pattern_table(adc_ll_num_t adc_n, uint32_t pattern_index, adc_hal_digi_pattern_table_t pattern)
+static inline void adc_ll_digi_set_pattern_table(adc_ll_num_t adc_n, uint32_t pattern_index, adc_digi_pattern_table_t pattern)
 {
     uint32_t tab;
     uint8_t index = pattern_index / 4;
@@ -488,36 +452,6 @@ static inline void adc_ll_set_sar_clk_div(adc_ll_num_t adc_n, uint32_t div)
 
 /**
  * Set the attenuation of a particular channel on ADCn.
- *
- * @note For any given channel, this function must be called before the first time conversion.
- *
- * The default ADC full-scale voltage is 1.1V. To read higher voltages (up to the pin maximum voltage,
- * usually 3.3V) requires setting >0dB signal attenuation for that ADC channel.
- *
- * When VDD_A is 3.3V:
- *
- * - 0dB attenuation (ADC_ATTEN_DB_0) gives full-scale voltage 1.1V
- * - 2.5dB attenuation (ADC_ATTEN_DB_2_5) gives full-scale voltage 1.5V
- * - 6dB attenuation (ADC_ATTEN_DB_6) gives full-scale voltage 2.2V
- * - 11dB attenuation (ADC_ATTEN_DB_11) gives full-scale voltage 3.9V (see note below)
- *
- * @note The full-scale voltage is the voltage corresponding to a maximum reading (depending on ADC1 configured
- * bit width, this value is: 4095 for 12-bits, 2047 for 11-bits, 1023 for 10-bits, 511 for 9 bits.)
- *
- * @note At 11dB attenuation the maximum voltage is limited by VDD_A, not the full scale voltage.
- *
- * Due to ADC characteristics, most accurate results are obtained within the following approximate voltage ranges:
- *
- * - 0dB attenuation (ADC_ATTEN_DB_0) between 100 and 950mV
- * - 2.5dB attenuation (ADC_ATTEN_DB_2_5) between 100 and 1250mV
- * - 6dB attenuation (ADC_ATTEN_DB_6) between 150 to 1750mV
- * - 11dB attenuation (ADC_ATTEN_DB_11) between 150 to 2450mV
- *
- * For maximum accuracy, use the ADC calibration APIs and measure voltages within these recommended ranges.
- *
- * @param adc_n ADC unit.
- * @param channel ADCn channel number.
- * @param atten The attenuation option.
  */
 static inline void adc_ll_set_atten(adc_ll_num_t adc_n, adc_channel_t channel, adc_atten_t atten)
 {
@@ -682,43 +616,43 @@ static inline void adc_ll_set_hall_controller(adc_ll_hall_controller_t hall_ctrl
 }
 
 /**
- *  Output ADC2 reference voltage to gpio 25 or 26 or 27
+ *  Output ADC internal reference voltage to channels, only available for ADC2 on ESP32.
  *
- *  This function utilizes the testing mux exclusive to ADC 2 to route the
- *  reference voltage one of ADC2's channels. Supported gpios are gpios
- *  25, 26, and 27. This refernce voltage can be manually read from the pin
- *  and used in the esp_adc_cal component.
+ *  This function routes the internal reference voltage of ADCn to one of
+ *  ADC2's channels. This reference voltage can then be manually measured
+ *  for calibration purposes.
  *
- *  @param[in]  io    GPIO number (gpios 25,26,27 supported)
- *
- *  @return
- *                  - true: v_ref successfully routed to selected gpio
- *                  - false: Unsupported gpio
+ *  @param[in]  adc ADC unit select
+ *  @param[in]  channel ADC2 channel number
+ *  @param[in]  en Enable/disable the reference voltage output
  */
-static inline bool adc_ll_vref_output(int io)
+static inline void adc_ll_vref_output(adc_ll_num_t adc, adc_channel_t channel, bool en)
 {
-    int channel;
-    if (io == 25) {
-        channel = 8;    //Channel 8 bit
-    } else if (io == 26) {
-        channel = 9;    //Channel 9 bit
-    } else if (io == 27) {
-        channel = 7;    //Channel 7 bit
+    if (adc != ADC_NUM_2) return;
+
+    if (en) {
+        RTCCNTL.bias_conf.dbg_atten = 0;     //Check DBG effect outside sleep mode
+        //set dtest (MUX_SEL : 0 -> RTC; 1-> vdd_sar2)
+        RTCCNTL.test_mux.dtest_rtc = 1;      //Config test mux to route v_ref to ADC2 Channels
+        //set ent
+        RTCCNTL.test_mux.ent_rtc = 1;
+        //set sar2_en_test
+        SENS.sar_start_force.sar2_en_test = 1;
+        //set sar2 en force
+        SENS.sar_meas_start2.sar2_en_pad_force = 1;      //Pad bitmap controlled by SW
+        //set en_pad for channels 7,8,9 (bits 0x380)
+        SENS.sar_meas_start2.sar2_en_pad = 1 << channel;
     } else {
-        return false;
+        RTCCNTL.test_mux.dtest_rtc = 0;      //Config test mux to route v_ref to ADC2 Channels
+        //set ent
+        RTCCNTL.test_mux.ent_rtc = 0;
+        //set sar2_en_test
+        SENS.sar_start_force.sar2_en_test = 0;
+        //set sar2 en force
+        SENS.sar_meas_start2.sar2_en_pad_force = 0;      //Pad bitmap controlled by SW
+        //set en_pad for channels 7,8,9 (bits 0x380)
+        SENS.sar_meas_start2.sar2_en_pad = 0;
     }
-    RTCCNTL.bias_conf.dbg_atten = 0;     //Check DBG effect outside sleep mode
-    //set dtest (MUX_SEL : 0 -> RTC; 1-> vdd_sar2)
-    RTCCNTL.test_mux.dtest_rtc = 1;      //Config test mux to route v_ref to ADC2 Channels
-    //set ent
-    RTCCNTL.test_mux.ent_rtc = 1;
-    //set sar2_en_test
-    SENS.sar_start_force.sar2_en_test = 1;
-    //set sar2 en force
-    SENS.sar_meas_start2.sar2_en_pad_force = 1;      //Pad bitmap controlled by SW
-    //set en_pad for channels 7,8,9 (bits 0x380)
-    SENS.sar_meas_start2.sar2_en_pad = 1 << channel;
-    return true;
 }
 
 #ifdef __cplusplus

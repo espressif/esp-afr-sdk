@@ -1,10 +1,14 @@
-===============
-ESP-LyraT-8311A
-===============
+====================
+ESP-LyraT-8311A v1.2
+====================
 
 :link_to_translation:`zh_CN:[中文]`
 
-This user guide provides information on the ESP-LyraT-8311A extension board. This board cannot be bought separately and is usually sold together with other Espressif development boards (e.g., ESP32-S2-Kaluga-1), which will be referred to as *main boards* below.
+This user guide provides information on the ESP-LyraT-8311A extension board.
+
+This board cannot be bought separately and is usually sold together with other Espressif development boards (e.g., ESP32-S2-Kaluga-1), which will be referred to as *main boards* below.
+
+Currently, ESP-LyraT-8311A v1.3 is sold as part of the :doc:`user-guide-esp32-s2-kaluga-1-kit-v1.2`.
 
 The ESP-LyraT-8311A extends the functionality of your main board by adding sound processing functionality:
 
@@ -35,8 +39,7 @@ The document consists of the following major sections:
 Overview
 ========
 
-The ESP-LyraT-8311A is mainly designed for audio applications. However, it can also be used for other purposes.
-
+The ESP-LyraT-8311A is mainly designed for audio applications. However, you can use your creativity to come up with any other use cases.
 
 Description of Components
 -------------------------
@@ -45,7 +48,7 @@ Description of Components
     :align: center
     :width: 934px
     :height: 565px
-    :scale: 80%
+    :scale: 70%
     :alt: ESP-LyraT-8311A - front
     :figclass: align-center
 
@@ -65,11 +68,11 @@ The description of components starts from the top right corner and then goes clo
    * - Extension Header
      - Male Extension Header on the flip side is for mounting onto main board's Extension Header; Female Extension Header is for mounting other boards that have a Male Extension Header
    * - Function Button
-     - Programmable button
+     - This board has six programmable buttons
    * - Microphone
      - Supports Electret and MEMS microphones; this extension board is supplied with an electret microphone
    * - Headphone Connector
-     - 1/8" headphone connector
+     - 6.3 mm (1/8") stereo headphone connector
    * - Speaker Connector
      - Connect an external speaker to the 2-pin connector
    * - PA
@@ -110,10 +113,10 @@ To mount your ESP-LyraT-8311A onto the board with a female Extension Header:
 Software Setup
 ^^^^^^^^^^^^^^
 
-Depending on your application see:
+Depending on your application, see:
 
 * `ESP-ADF Getting Started Guide <https://docs.espressif.com/projects/esp-adf/en/latest/get-started/index.html#about-esp-adf>`_ if you develop with ESP-ADF (Espressif Audio Development Framework).
-* Section :ref:`user-guide-esp32-s2-kaluga-1-kit-software-setup` of the ESP32-S2-Kaluga-1 kit user guide if you develop directly with ESP-IDF (Espressif IOT Development Framework).
+* Section :ref:`user-guide-esp32-s2-kaluga-1-kit-v1.2-software-setup` of the ESP32-S2-Kaluga-1 kit user guide if you develop directly with ESP-IDF (Espressif IOT Development Framework).
 
 
 Hardware Reference

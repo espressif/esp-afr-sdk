@@ -2,9 +2,9 @@
 Get Started
 ***********
 
-{IDF_TARGET_CL:default = "esp32", esp32 = "esp32", esp32s2 = "esp32s2"}
-
 :link_to_translation:`zh_CN:[中文]`
+
+.. Please keep README.md in sync with these instructions.
 
 This document is intended to help you set up the software development environment for the hardware based on the {IDF_TARGET_NAME} chip by Espressif.
 
@@ -17,15 +17,23 @@ Introduction
 
 {IDF_TARGET_NAME} is a system on a chip that integrates the following features:
 
-.. list::
+.. only:: esp32
 
     * Wi-Fi (2.4 GHz band)
-    :SOC_BT_SUPPORTED: * Bluetooth
-    :CONFIG_FREERTOS_UNICORE: * Dual high performance cores
+    * Bluetooth
+    * Dual high performance cores
     * Ultra Low Power co-processor
     * Multiple peripherals
-    :esp32s2: * Built-in security hardware
-    :esp32s2: * USB OTG interface
+
+
+.. only:: esp32s2
+
+    * Wi-Fi (2.4 GHz band)
+    * High performance single-core
+    * Ultra Low Power co-processor running either RISC-V or FSM core
+    * Multiple peripherals
+    * Built-in security hardware
+    * USB OTG interface
 
 Powered by 40 nm technology, {IDF_TARGET_NAME} provides a robust, highly integrated platform, which helps meet the continuous demands for efficient power usage, compact design, security, high performance, and reliability.
 
@@ -42,11 +50,16 @@ Hardware:
 
 Software:
 
-* **Toolchain** to compile code for {IDF_TARGET_NAME}
-* **Build tools** - CMake and Ninja to build a full **Application** for {IDF_TARGET_NAME}
-* **ESP-IDF** that essentially contains API (software libraries and source code) for {IDF_TARGET_NAME} and scripts to operate the **Toolchain**
-* **Text editor** to write programs (**Projects**) in C, e.g., `Eclipse <https://www.eclipse.org/>`_
+You have a choice to either download and install the following software manually
 
+    * **Toolchain** to compile code for {IDF_TARGET_NAME}
+    * **Build tools** - CMake and Ninja to build a full **Application** for {IDF_TARGET_NAME}
+    * **ESP-IDF** that essentially contains API (software libraries and source code) for {IDF_TARGET_NAME} and scripts to operate the **Toolchain**
+
+**or** get through the onboarding process using the following official plugins for integrated development environments (IDE) described in separate documents
+
+    * `Eclipse Plugin <https://github.com/espressif/idf-eclipse-plugin>`_ (`installation link <https://github.com/espressif/idf-eclipse-plugin#installing-idf-plugin-using-update-site-url>`_)
+    * `VS Code Extension <https://github.com/espressif/vscode-esp-idf-extension>`_ (`onboarding <https://github.com/espressif/vscode-esp-idf-extension/blob/master/docs/ONBOARDING.md>`_)
 
 .. figure:: ../../_static/what-you-need.png
     :align: center
@@ -249,13 +262,19 @@ In the terminal where you are going to use ESP-IDF, run:
 
 Note the space between the leading dot and the path!
 
-You can also create an alias for the export script to your ``.profile`` or ``.bash_profile`` script. This way you can set up the environment in a new terminal window by typing ``get_idf``:
+If you plan to use esp-idf frequently, you can create an alias for executing ``export.sh``:
 
-.. code-block:: bash
+1.  Copy and paste the following command to your shell's profile (``.profile``, ``.bashrc``, ``.zprofile``, etc.)
 
-    alias get_idf='. $HOME/esp/esp-idf/export.sh'
+    .. code-block:: bash
 
-Note that it is not recommended to source ``export.sh`` from the profile script directly. Doing so activates IDF virtual environment in every terminal session (even in those where IDF is not needed), defeating the purpose of the virtual environment and likely affecting other software.
+        alias get_idf='. $HOME/esp/esp-idf/export.sh'
+
+2.  Refresh the configuration by restarting the terminal session or by running ``source [path to profile]``, for example, ``source ~/.bashrc``.
+
+Now you can run ``get_idf`` to set up or refresh the esp-idf environment in any terminal session.
+
+Technically, you can add ``export.sh`` to your shell's profile directly; however, it is not recommended. Doing so activates IDF virtual environment in every terminal session (including those where IDF is not needed), defeating the purpose of the virtual environment and likely affecting other software.
 
 .. _get-started-start-project:
 
@@ -264,7 +283,7 @@ Step 5. Start a Project
 
 Now you are ready to prepare your application for {IDF_TARGET_NAME}. You can start with :example:`get-started/hello_world` project from :idf:`examples` directory in IDF.
 
-Copy :example:`get-started/hello_world` to ``~/esp`` directory:
+Copy the project :example:`get-started/hello_world` to ``~/esp`` directory:
 
 Linux and macOS
 ~~~~~~~~~~~~~~~
@@ -323,7 +342,7 @@ Linux and macOS
 .. code-block:: bash
 
     cd ~/esp/hello_world
-    idf.py set-target {IDF_TARGET_CL}
+    idf.py set-target {IDF_TARGET_PATH_NAME}
     idf.py menuconfig
 
 Windows
@@ -332,10 +351,10 @@ Windows
 .. code-block:: batch
 
     cd %userprofile%\esp\hello_world
-    idf.py set-target {IDF_TARGET_CL}
+    idf.py set-target {IDF_TARGET_PATH_NAME}
     idf.py menuconfig
 
-Setting the target with ``idf.py set-target {IDF_TARGET}`` should be done once, after opening a new project. If the project contains some existing builds and configuration, they will be cleared and initialized. The target may be saved in environment variable to skip this step at all. See :ref:`selecting-idf-target` for additional information.
+Setting the target with ``idf.py set-target {IDF_TARGET_PATH_NAME}`` should be done once, after opening a new project. If the project contains some existing builds and configuration, they will be cleared and initialized. The target may be saved in environment variable to skip this step at all. See :ref:`selecting-idf-target` for additional information.
 
 If the previous steps have been done correctly, the following menu appears:
 
@@ -392,7 +411,7 @@ This command will compile the application and all ESP-IDF components, then it wi
    ../../../components/esptool_py/esptool/esptool.py -p (PORT) -b 921600 write_flash --flash_mode dio --flash_size detect --flash_freq 40m 0x10000 build/hello-world.bin  build 0x1000 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin
    or run 'idf.py -p PORT flash'
 
-If there are no errors, the build will finish by generating the firmware binary .bin file.
+If there are no errors, the build will finish by generating the firmware binary .bin files.
 
 
 .. _get-started-flash:
@@ -400,7 +419,7 @@ If there are no errors, the build will finish by generating the firmware binary 
 Step 9. Flash onto the Device
 =============================
 
-Flash the binaries that you just built onto your {IDF_TARGET_NAME} board by running:
+Flash the binaries that you just built (bootloader.bin, partition-table.bin and hello-world.bin) onto your {IDF_TARGET_NAME} board by running:
 
 .. code-block:: bash
 
@@ -523,7 +542,7 @@ When flashing, you will see the output log similar to the following:
 
 If there are no issues by the end of the flash process, the board will reboot and start up the “hello_world” application.
 
-If you'd like to use the Eclipse IDE instead of running ``idf.py``, check out the :doc:`Eclipse guide <eclipse-setup>`.
+If you'd like to use the Eclipse or VS Code IDE instead of running ``idf.py``, check out the :doc:`Eclipse guide <eclipse-setup>`, :doc:`VS Code guide <vscode-setup>`.
 
 
 .. _get-started-build-monitor:
@@ -617,6 +636,7 @@ Related Documents
 
     establish-serial-connection
     eclipse-setup
+    vscode-setup
     ../api-guides/tools/idf-monitor
     toolchain-setup-scratch
     :esp32: ../get-started-legacy/index

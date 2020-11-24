@@ -14,9 +14,10 @@
 
 // The HAL layer for ADC (esp32s2 specific part)
 
+#include "sdkconfig.h"
 #include "hal/adc_hal.h"
 #include "hal/adc_types.h"
-#include "esp_log.h"
+
 /*---------------------------------------------------------------
                     Digital controller setting
 ---------------------------------------------------------------*/
@@ -94,9 +95,12 @@ void adc_hal_digi_controller_config(const adc_digi_config_t *cfg)
 /**
  * Set ADC digital controller clock division factor. The clock divided from `APLL` or `APB` clock.
  * Enable clock and select clock source for ADC digital controller.
- * Expression: controller_clk = APLL/APB * (div_num  + div_b / div_a).
+ * Expression: controller_clk = (`APLL` or `APB`) / (div_num + div_a / div_b + 1).
  *
- * @param clk Refer to `adc_digi_clk_t`.
+ * @note ADC and DAC digital controller share the same frequency divider.
+ *       Please set a reasonable frequency division factor to meet the sampling frequency of the ADC and the output frequency of the DAC.
+ *
+ * @param clk Refer to ``adc_digi_clk_t``.
  */
 void adc_hal_digi_clk_config(const adc_digi_clk_t *clk)
 {
@@ -127,7 +131,7 @@ void adc_hal_digi_disable(void)
  *
  * @note The monitor will monitor all the enabled channel data of the each ADC unit at the same time.
  * @param adc_n ADC unit.
- * @param config Refer to `adc_digi_monitor_t`.
+ * @param config Refer to ``adc_digi_monitor_t``.
  */
 void adc_hal_digi_monitor_config(adc_ll_num_t adc_n, adc_digi_monitor_t *config)
 {
@@ -148,7 +152,7 @@ void adc_hal_digi_monitor_config(adc_ll_num_t adc_n, adc_digi_monitor_t *config)
  * @note The arbiter's working clock is APB_CLK. When the APB_CLK clock drops below 8 MHz, the arbiter must be in shield mode.
  * @note Default priority: Wi-Fi > RTC > Digital;
  *
- * @param config Refer to `adc_arbiter_t`.
+ * @param config Refer to ``adc_arbiter_t``.
  */
 void adc_hal_arbiter_config(adc_arbiter_t *config)
 {
@@ -174,6 +178,10 @@ static uint32_t adc_hal_read_self_cal(adc_ll_num_t adc_n, int channel)
 
 uint32_t adc_hal_calibration(adc_ll_num_t adc_n, adc_channel_t channel, adc_atten_t atten, bool internal_gnd, bool force_cal)
 {
+#ifdef CONFIG_IDF_ENV_FPGA
+    return 0;
+#endif
+
     if (!force_cal) {
         if (s_adc_cali_param[adc_n][atten]) {
             return (uint32_t)s_adc_cali_param[adc_n][atten];

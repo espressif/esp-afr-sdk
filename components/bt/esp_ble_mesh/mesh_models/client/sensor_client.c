@@ -341,7 +341,7 @@ static void sensor_status(struct bt_mesh_model *model,
     return;
 }
 
-const struct bt_mesh_model_op sensor_cli_op[] = {
+const struct bt_mesh_model_op bt_mesh_sensor_cli_op[] = {
     { BLE_MESH_MODEL_OP_SENSOR_DESCRIPTOR_STATUS, 0, sensor_status },
     { BLE_MESH_MODEL_OP_SENSOR_CADENCE_STATUS,    2, sensor_status },
     { BLE_MESH_MODEL_OP_SENSOR_SETTINGS_STATUS,   2, sensor_status },
@@ -447,21 +447,14 @@ static int sensor_act_state(bt_mesh_client_common_param_t *common,
         goto end;
     }
 
-    err = bt_mesh_client_send_msg(common->model, common->opcode, &common->ctx, msg,
-                                  timeout_handler, common->msg_timeout, need_ack,
-                                  common->cb, common->cb_data);
-    if (err) {
-        BT_ERR("Failed to send Sensor client message (err %d)", err);
-    }
+    err = bt_mesh_client_send_msg(common, msg, need_ack, timeout_handler);
 
 end:
     bt_mesh_free_buf(msg);
-
     return err;
 }
 
-int bt_mesh_sensor_client_get_state(bt_mesh_client_common_param_t *common,
-                                    void *get, void *status)
+int bt_mesh_sensor_client_get_state(bt_mesh_client_common_param_t *common, void *get)
 {
     bt_mesh_sensor_client_t *client = NULL;
     u16_t length = 0U;
@@ -526,8 +519,7 @@ int bt_mesh_sensor_client_get_state(bt_mesh_client_common_param_t *common,
     return sensor_act_state(common, get, length, true);
 }
 
-int bt_mesh_sensor_client_set_state(bt_mesh_client_common_param_t *common,
-                                    void *set, void *status)
+int bt_mesh_sensor_client_set_state(bt_mesh_client_common_param_t *common, void *set)
 {
     bt_mesh_sensor_client_t *client = NULL;
     u16_t length = 0U;
@@ -582,21 +574,19 @@ int bt_mesh_sensor_client_set_state(bt_mesh_client_common_param_t *common,
     return sensor_act_state(common, set, length, need_ack);
 }
 
-int bt_mesh_sensor_cli_init(struct bt_mesh_model *model, bool primary)
+static int sensor_client_init(struct bt_mesh_model *model)
 {
     sensor_internal_data_t *internal = NULL;
     bt_mesh_sensor_client_t *client = NULL;
 
-    BT_DBG("primary %u", primary);
-
     if (!model) {
-        BT_ERR("%s, Invalid parameter", __func__);
+        BT_ERR("Invalid Sensor client model");
         return -EINVAL;
     }
 
     client = (bt_mesh_sensor_client_t *)model->user_data;
     if (!client) {
-        BT_ERR("Invalid Sensor client user data");
+        BT_ERR("No Sensor client context provided");
         return -EINVAL;
     }
 
@@ -622,18 +612,18 @@ int bt_mesh_sensor_cli_init(struct bt_mesh_model *model, bool primary)
     return 0;
 }
 
-int bt_mesh_sensor_cli_deinit(struct bt_mesh_model *model, bool primary)
+static int sensor_client_deinit(struct bt_mesh_model *model)
 {
     bt_mesh_sensor_client_t *client = NULL;
 
     if (!model) {
-        BT_ERR("%s, Invalid parameter", __func__);
+        BT_ERR("Invalid Sensor client model");
         return -EINVAL;
     }
 
     client = (bt_mesh_sensor_client_t *)model->user_data;
     if (!client) {
-        BT_ERR("Invalid Sensor client user data");
+        BT_ERR("No Sensor client context provided");
         return -EINVAL;
     }
 
@@ -650,3 +640,8 @@ int bt_mesh_sensor_cli_deinit(struct bt_mesh_model *model, bool primary)
 
     return 0;
 }
+
+const struct bt_mesh_model_cb bt_mesh_sensor_client_cb = {
+    .init = sensor_client_init,
+    .deinit = sensor_client_deinit,
+};

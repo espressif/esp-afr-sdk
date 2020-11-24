@@ -17,12 +17,6 @@
 #include "soc/soc.h"
 #include "hal/i2s_hal.h"
 
-void i2s_hal_reset_fifo(i2s_hal_context_t *hal)
-{
-    i2s_ll_reset_rx_fifo(hal->dev);
-    i2s_ll_reset_tx_fifo(hal->dev);
-}
-
 void i2s_hal_set_tx_mode(i2s_hal_context_t *hal, i2s_channel_t ch, i2s_bits_per_sample_t bits)
 {
     if (bits <= I2S_BITS_PER_SAMPLE_16BIT) {
@@ -84,10 +78,13 @@ void i2s_hal_set_rx_bits_mod(i2s_hal_context_t *hal, i2s_bits_per_sample_t bits)
 
 void i2s_hal_reset(i2s_hal_context_t *hal)
 {
-    i2s_ll_reset_dma_in(hal->dev);
-    i2s_ll_reset_dma_out(hal->dev);
+    // Reset I2S TX/RX module first, and then, reset DMA and FIFO.
     i2s_ll_reset_tx(hal->dev);
     i2s_ll_reset_rx(hal->dev);
+    i2s_ll_reset_dma_in(hal->dev);
+    i2s_ll_reset_dma_out(hal->dev);
+    i2s_ll_reset_rx_fifo(hal->dev);
+    i2s_ll_reset_tx_fifo(hal->dev);
 }
 
 void i2s_hal_start_tx(i2s_hal_context_t *hal)
@@ -228,6 +225,9 @@ void i2s_hal_config_param(i2s_hal_context_t *hal, const i2s_config_t *i2s_config
         }
         if (i2s_config->mode & I2S_MODE_ADC_BUILT_IN) {
             i2s_ll_build_in_adc_ena(hal->dev);
+            i2s_ll_set_rx_chan_mod(hal->dev, 1);
+            i2s_ll_set_rx_fifo_mod(hal->dev, 1);
+            i2s_ll_set_rx_mono(hal->dev, 0);
         }
         // Buildin ADC and DAC have nothing to do with communication format configuration.
         return;

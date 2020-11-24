@@ -1,10 +1,14 @@
-=============
-ESP-LyraP-CAM
-=============
+==================
+ESP-LyraP-CAM v1.0
+==================
 
 :link_to_translation:`zh_CN:[中文]`
 
-This user guide provides information on the ESP-LyraP-CAM extension board. This extension board cannot be bought separately and is usually sold together with other Espressif development boards (e.g., ESP32-S2-Kaluga-1), which will be referred to as *main boards* below.
+This user guide provides information on the ESP-LyraP-CAM extension board.
+
+This extension board cannot be bought separately and is usually sold together with other Espressif development boards (e.g., ESP32-S2-Kaluga-1), which will be referred to as *main boards* below.
+
+Currently, ESP-LyraP-CAM v1.0 is sold as part of the :doc:`user-guide-esp32-s2-kaluga-1-kit-v1.2`.
 
 The ESP-LyraP-CAM extends the functionality of your main board by adding a camera.
 
@@ -48,11 +52,11 @@ Description of Components
    * - Main Board Camera Header
      - Mount onto main board's Camera Header
    * - Power ON LED
-     - Red LED is on if the power supply voltage is correct
+     - Red LED is on if the power supply voltage is applied
    * - Camera Module Connector
      - Supports OV2640 and OV3660 camera modules; this extension board is supplied with an OV2640 camera module
-   * - Power Regulator
-     - LDO Regulator converting 3.3 V to 2.8 V and 1.5 V
+   * - Power Regulators
+     - LDO Regulators converting 3.3 V to 2.8 V and 1.5 V
 
 
 Start Application Development
@@ -78,7 +82,7 @@ Insert the ESP-LyraP-CAM extension board into your board's female Camera Header.
 Software Setup
 ^^^^^^^^^^^^^^
 
-See Section :ref:`user-guide-esp32-s2-kaluga-1-kit-software-setup` of the ESP32-S2-Kaluga-1 kit user guide.
+See Section :ref:`user-guide-esp32-s2-kaluga-1-kit-v1.2-software-setup` of the ESP32-S2-Kaluga-1 kit user guide.
 
 
 Hardware Reference

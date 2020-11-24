@@ -218,7 +218,7 @@ static void clear_friendship(bool force, bool disable)
         return;
     }
 
-    bt_mesh_rx_reset();
+    bt_mesh_rx_reset(true);
 
     k_delayed_work_cancel(&lpn->timer);
 
@@ -834,7 +834,7 @@ static void lpn_timeout(struct k_work *work)
         update_timeout(lpn);
         break;
     default:
-        __ASSERT(0, "Unhandled LPN state");
+        BT_ERR("Unhandled LPN state");
         break;
     }
 }

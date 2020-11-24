@@ -368,6 +368,9 @@ static esp_err_t esp_netif_init_configuration(esp_netif_t *esp_netif, const esp_
         if (esp_netif_driver_config->transmit) {
             esp_netif->driver_transmit = esp_netif_driver_config->transmit;
         }
+        if (esp_netif_driver_config->transmit_wrap) {
+            esp_netif->driver_transmit_wrap = esp_netif_driver_config->transmit_wrap;
+        }
         if (esp_netif_driver_config->driver_free_rx_buffer) {
             esp_netif->driver_free_rx_buffer = esp_netif_driver_config->driver_free_rx_buffer;
         }
@@ -522,6 +525,7 @@ esp_err_t esp_netif_set_driver_config(esp_netif_t *esp_netif,
     }
     esp_netif->driver_handle = driver_config->handle;
     esp_netif->driver_transmit = driver_config->transmit;
+    esp_netif->driver_transmit_wrap = driver_config->transmit_wrap;
     esp_netif->driver_free_rx_buffer = driver_config->driver_free_rx_buffer;
     return ESP_OK;
 }
@@ -728,6 +732,16 @@ esp_err_t esp_netif_stop(esp_netif_t *esp_netif)
     return esp_netif_lwip_ipc_call(esp_netif_stop_api, esp_netif, NULL);
 }
 
+void esp_netif_netstack_buf_ref(void *pbuf)
+{
+    pbuf_ref(pbuf);
+}
+
+void esp_netif_netstack_buf_free(void *pbuf)
+{
+    pbuf_free(pbuf);
+}
+
 //
 // IO translate functions
 //
@@ -740,6 +754,11 @@ void esp_netif_free_rx_buffer(void *h, void* buffer)
 esp_err_t esp_netif_transmit(esp_netif_t *esp_netif, void* data, size_t len)
 {
     return (esp_netif->driver_transmit)(esp_netif->driver_handle, data, len);
+}
+
+esp_err_t esp_netif_transmit_wrap(esp_netif_t *esp_netif, void *data, size_t len, void *pbuf)
+{
+    return (esp_netif->driver_transmit_wrap)(esp_netif->driver_handle, data, len, pbuf);
 }
 
 esp_err_t esp_netif_receive(esp_netif_t *esp_netif, void *buffer, size_t len, void *eb)
@@ -916,6 +935,11 @@ static esp_err_t esp_netif_dhcpc_start_api(esp_netif_api_msg_t *msg)
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (esp_netif->dhcpc_status == ESP_NETIF_DHCP_STARTED) {
+        ESP_LOGD(TAG, "dhcp client already started");
+        return ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED;
+    }
+
     struct netif *p_netif = esp_netif->lwip_netif;
 
     esp_netif_reset_ip_info(esp_netif);
@@ -983,6 +1007,11 @@ static esp_err_t esp_netif_dhcps_start_api(esp_netif_api_msg_t *msg)
 
     if (!esp_netif) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    if (esp_netif->dhcps_status == ESP_NETIF_DHCP_STARTED) {
+        ESP_LOGD(TAG, "dhcp server already started");
+        return ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED;
     }
 
     struct netif *p_netif = esp_netif->lwip_netif;

@@ -172,7 +172,7 @@ static void set_isr_wrapper(int32_t n, void *f, void *arg)
 static void * spin_lock_create_wrapper(void)
 {
     portMUX_TYPE tmp = portMUX_INITIALIZER_UNLOCKED;
-    void *mux = malloc(sizeof(portMUX_TYPE));
+    void *mux = heap_caps_malloc(sizeof(portMUX_TYPE), MALLOC_CAP_8BIT|MALLOC_CAP_INTERNAL);
 
     if (mux) {
         memcpy(mux,&tmp,sizeof(portMUX_TYPE));
@@ -199,6 +199,11 @@ static void IRAM_ATTR wifi_int_restore_wrapper(void *wifi_int_mux, uint32_t tmp)
     } else {
         portEXIT_CRITICAL(wifi_int_mux);
     }
+}
+
+static bool IRAM_ATTR is_from_isr_wrapper(void)
+{
+    return xPortInIsrContext();
 }
 
 static void IRAM_ATTR task_yield_from_isr_wrapper(void)
@@ -635,6 +640,7 @@ wifi_osi_funcs_t g_wifi_osi_funcs = {
     ._coex_condition_set = coex_condition_set_wrapper,
     ._coex_wifi_request = coex_wifi_request_wrapper,
     ._coex_wifi_release = coex_wifi_release_wrapper,
+    ._is_from_isr = is_from_isr_wrapper,
     ._magic = ESP_WIFI_OS_ADAPTER_MAGIC,
 };
 

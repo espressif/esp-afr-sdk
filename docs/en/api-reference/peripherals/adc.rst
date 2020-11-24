@@ -10,7 +10,7 @@ Overview
 
 .. only:: esp32
 
-    The {IDF_TARGET_NAME} integrates two 12-bit SAR (`Successive Approximation Register <https://en.wikipedia.org/wiki/Successive_approximation_ADC>`_) ADCs supporting a total of 18 measurement channels (analog enabled pins).
+    The {IDF_TARGET_NAME} integrates two 12-bit SAR (`Successive Approximation Register <https://en.wikipedia.org/wiki/Successive_approximation_ADC>`_) ADCs, supporting a total of 18 measurement channels (analog enabled pins).
 
     The ADC driver API supports ADC1 (8 channels, attached to GPIOs 32 - 39), and ADC2 (10 channels, attached to GPIOs 0, 2, 4, 12 - 15 and 25 - 27). However, the usage of ADC2 has some restrictions for the application:
 
@@ -22,14 +22,19 @@ Overview
 
 .. only:: esp32s2
 
-    The {IDF_TARGET_NAME} integrates two 12-bit SAR (`Successive Approximation Register <https://en.wikipedia.org/wiki/Successive_approximation_ADC>`_) ADCs supporting a total of 20 measurement channels (analog enabled pins).
+    The {IDF_TARGET_NAME} integrates two 13-bit SAR (`Successive Approximation Register <https://en.wikipedia.org/wiki/Successive_approximation_ADC>`_) ADCs, supporting a total of 20 measurement channels (analog enabled pins).
 
     The ADC driver API supports ADC1 (10 channels, attached to GPIOs 1 - 10), and ADC2 (10 channels, attached to GPIOs 11 - 20). However, the usage of ADC2 has some restrictions for the application:
 
-    1. ADC2 is used by the Wi-Fi driver. Therefore the application can only use ADC2 when the Wi-Fi driver has not started.
+    1. Different from ADC1, the hardware arbiter function is added to ADC2, so when using the API of ADC2 to obtain the sampling voltage, you need to check whether the reading is successful.
 
 Configuration and Reading ADC
 -----------------------------
+
+Each ADC unit supports two work modes, ADC-RTC or ADC-DMA mode. ADC-RTC is controlled by the RTC controller and is suitable for low-frequency sampling operations. ADC-DMA is controlled by a digital controller and is suitable for high-frequency continuous sampling actions.
+
+ADC-RTC mode
+^^^^^^^^^^^^
 
 The ADC should be configured before reading is taken.
 
@@ -48,7 +53,12 @@ Then it is possible to read ADC conversion result with :cpp:func:`adc1_get_raw` 
 
 This API provides convenient way to configure ADC1 for reading from :doc:`ULP <../../api-guides/ulp>`. To do so, call function :cpp:func:`adc1_ulp_enable` and then set precision and attenuation as discussed above.
 
-There is another specific function :cpp:func:`adc2_vref_to_gpio` used to route internal reference voltage to a GPIO pin. It comes handy to calibrate ADC reading and this is discussed in section :ref:`adc-api-adc-calibration`.
+There is another specific function :cpp:func:`adc_vref_to_gpio` used to route internal reference voltage to a GPIO pin. It comes handy to calibrate ADC reading and this is discussed in section :ref:`adc-api-adc-calibration`.
+
+.. todo::
+
+    1. Add `ADC-DMA mode` configuration after ADC-DMA driver done.
+    2. Add table for ADC-DMA clock system.
 
 Application Examples
 --------------------
@@ -63,8 +73,8 @@ Reading voltage on ADC1 channel 0 ({IDF_TARGET_ADC1_CH0})::
         adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_0);
         int val = adc1_get_raw(ADC1_CHANNEL_0);
 
-The input voltage in above example is from 0 to 1.1V (0 dB attenuation). The input range can be extended by setting higher attenuation, see :cpp:type:`adc_atten_t`.
-An example using the ADC driver including calibration (discussed below) is available in esp-idf: :example:`peripherals/adc`
+The input voltage in the above example is from 0 to 1.1 V (0 dB attenuation). The input range can be extended by setting a higher attenuation, see :cpp:type:`adc_atten_t`.
+An example of using the ADC driver including calibration (discussed below) is available at esp-idf: :example:`peripherals/adc`
 
 Reading voltage on ADC2 channel 7 ({IDF_TARGET_ADC2_CH7})::
 
@@ -97,8 +107,13 @@ An example using the ADC2 driver to read the output of DAC is available in esp-i
             int val = hall_sensor_read();
 
 
+.. only:: esp32
 
-The value read in both these examples is 12 bits wide (range 0-4095).
+    The value read in both these examples is 12 bits wide (range 0-4095).
+
+.. only:: esp32s2
+
+    The value read in both these examples is 13 bits wide (range 0-8191).
 
 .. _adc-api-adc-calibration:
 
@@ -116,7 +131,7 @@ The {IDF_TARGET_NAME} ADC can be sensitive to noise leading to large discrepanci
 ADC Calibration
 ---------------
 
-The :component_file:`esp_adc_cal/include/esp_adc_cal.h` API provides functions to correct for differences in measured voltages caused by variation of ADC reference voltages (Vref) between chips. Per design the ADC reference voltage is 1100mV, however the true reference voltage can range from 1000mV to 1200mV amongst different {IDF_TARGET_NAME}s.
+The :component_file:`esp_adc_cal/include/esp_adc_cal.h` API provides functions to correct for differences in measured voltages caused by variation of ADC reference voltages (Vref) between chips. Per design the ADC reference voltage is 1100 mV, however the true reference voltage can range from 1000 mV to 1200 mV amongst different {IDF_TARGET_NAME}s.
 
 .. figure:: ../../../_static/adc-vref-graph.jpg
     :align: center
@@ -129,50 +144,62 @@ Correcting ADC readings using this API involves characterizing one of the ADCs a
 Calibration Values
 ^^^^^^^^^^^^^^^^^^
 
-Calibration values are used to generate characteristic curves that account for the unique ADC reference voltage of a particular {IDF_TARGET_NAME}. There are currently three sources of calibration values. The availability of these calibration values will depend on the type and production date of the {IDF_TARGET_NAME} chip/module.
-
-* **Two Point** values represent each of the ADCs’ readings at 150mV and 850mV. To obtain more accurate calibration results these values should be measured by user and burned into eFuse ``BLOCK3``.
-
-* **eFuse Vref** represents the true ADC reference voltage. This value is measured and burned into eFuse ``BLOCK0`` during factory calibration.
-
-* **Default Vref** is an estimate of the ADC reference voltage provided by the user as a parameter during characterization. If Two Point or eFuse Vref values are unavailable, **Default Vref** will be used.
+Calibration values are used to generate characteristic curves that account for the variation of ADC reference voltage of a particular {IDF_TARGET_NAME} chip. There are currently three sources of calibration values on ESP32, and one source on ESP32-S2. The availability of these calibration values will depend on the type and production date of the {IDF_TARGET_NAME} chip/module.
 
 .. only:: esp32
 
-    Individual measurement and burning of the **eFuse Vref** has been applied to ESP32-D0WD and ESP32-D0WDQ6 chips produced on/after the 1st week of 2018. Such chips may be recognized by date codes on/later than 012018 (see Line 4 on figure below).
+    * **Two Point** values represent each of the ADCs’ readings at 150 mV and 850 mV. To obtain more accurate calibration results these values should be measured by user and burned into eFuse ``BLOCK3``.
 
-    .. figure:: ../../../_static/chip_surface_marking.png
-        :align: center
-        :alt: ESP32 Chip Surface Marking
+    * **eFuse Vref** represents the true ADC reference voltage. This value is measured and burned into eFuse ``BLOCK0`` during factory calibration.
 
-        ESP32 Chip Surface Marking
+    * **Default Vref** is an estimate of the ADC reference voltage provided by the user as a parameter during characterization. If Two Point or eFuse Vref values are unavailable, **Default Vref** will be used.
 
-    If you would like to purchase chips or modules with calibration, double check with distributor or Espressif directly.
+        Individual measurement and burning of the **eFuse Vref** has been applied to ESP32-D0WD and ESP32-D0WDQ6 chips produced on/after the 1st week of 2018. Such chips may be recognized by date codes on/later than 012018 (see Line 4 on figure below).
+
+        .. figure:: ../../../_static/chip_surface_marking.png
+            :align: center
+            :alt: ESP32 Chip Surface Marking
+
+            ESP32 Chip Surface Marking
+
+        If you would like to purchase chips or modules with calibration, double check with distributor or Espressif directly.
+
+        .. highlight:: none
+
+        If you are unable to check the date code (i.e. the chip may be enclosed inside a canned module, etc.), you can still verify if **eFuse Vref** is present by running the `espefuse.py <https://github.com/espressif/esptool/wiki/espefuse>`_  tool with ``adc_info`` parameter ::
+
+            $IDF_PATH/components/esptool_py/esptool/espefuse.py --port /dev/ttyUSB0 adc_info
+
+        Replace ``/dev/ttyUSB0`` with {IDF_TARGET_NAME} board's port name.
+
+        A chip that has specific **eFuse Vref** value programmed (in this case 1093 mV) will be reported as follows::
+
+            ADC VRef calibration: 1093 mV
+
+        In another example below the **eFuse Vref** is not programmed::
+
+            ADC VRef calibration: None (1100 mV nominal)
+
+        For a chip with two point calibration the message will look similar to::
+
+            ADC VRef calibration: 1149 mV
+            ADC readings stored in efuse BLK3:
+                ADC1 Low reading  (150 mV): 306
+                ADC1 High reading (850 mV): 3153
+                ADC2 Low reading  (150 mV): 389
+                ADC2 High reading (850 mV): 3206
+
+.. only:: esp32s2
+
+    * **eFuse Two Point** values calibrates the ADC output at two different voltages. This value is measured and burned into eFuse ``BLOCK0`` during factory calibration on newly manufactured ESP32-S2 chips and modules. If you would like to purchase chips or modules with calibration, double check with distributor or Espressif directly.
 
     .. highlight:: none
 
-    If you are unable to check the date code (i.e. the chip may be enclosed inside a canned module, etc.), you can still verify if **eFuse Vref** is present by running `espefuse.py <https://github.com/espressif/esptool/wiki/espefuse>`_  tool with ``adc_info`` parameter ::
+    You can verify if **eFuse Two Point** is present by running the `espefuse.py <https://github.com/espressif/esptool/wiki/espefuse>`_  tool with ``adc_info`` parameter ::
 
         $IDF_PATH/components/esptool_py/esptool/espefuse.py --port /dev/ttyUSB0 adc_info
 
     Replace ``/dev/ttyUSB0`` with {IDF_TARGET_NAME} board's port name.
-
-    A chip that has specific **eFuse Vref** value programmed (in this case 1093mV) will be reported as follows::
-
-        ADC VRef calibration: 1093mV
-
-    In another example below the **eFuse Vref** is not programmed::
-
-        ADC VRef calibration: None (1100mV nominal)
-
-    For a chip with two point calibration the message will look similar to::
-
-        ADC VRef calibration: 1149mV
-        ADC readings stored in efuse BLK3:
-            ADC1 Low reading  (150mV): 306
-            ADC1 High reading (850mV): 3153
-            ADC2 Low reading  (150mV): 389
-            ADC2 High reading (850mV): 3206
 
 Application Example
 ^^^^^^^^^^^^^^^^^^^
@@ -213,7 +240,7 @@ Routing ADC reference voltage to GPIO, so it can be manually measured (for **Def
 
     ...
 
-        esp_err_t status = adc2_vref_to_gpio(GPIO_NUM_25);
+        esp_err_t status = adc_vref_to_gpio(ADC_UNIT_1, GPIO_NUM_25);
         if (status == ESP_OK) {
             printf("v_ref routed to GPIO\n");
         } else {
@@ -247,6 +274,8 @@ ADC driver
 .. include-build-file:: inc/adc.inc
 
 .. include-build-file:: inc/adc_types.inc
+
+.. include-build-file:: inc/adc_common.inc
 
 .. _adc-api-reference-adc-calibration:
 

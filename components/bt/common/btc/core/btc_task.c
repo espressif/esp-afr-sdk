@@ -68,7 +68,7 @@
 
 #define BTC_TASK_PINNED_TO_CORE         (TASK_PINNED_TO_CORE)
 #define BTC_TASK_STACK_SIZE             (BT_BTC_TASK_STACK_SIZE + BT_TASK_EXTRA_STACK_SIZE)	//by menuconfig
-#define BTC_TASK_NAME                   "btcT"
+#define BTC_TASK_NAME                   "BTC_TASK"
 #define BTC_TASK_PRIO                   (BT_TASK_MAX_PRIORITIES - 6)
 
 osi_thread_t *btc_thread;
@@ -185,6 +185,15 @@ static bt_status_t btc_task_post(btc_msg_t *msg, uint32_t timeout)
     return BT_STATUS_SUCCESS;
 }
 
+/**
+ * transfer an message to another module in the different task.
+ * @param  msg       message
+ * @param  arg       paramter
+ * @param  arg_len   length of paramter
+ * @param  copy_func deep copy function
+ * @return           BT_STATUS_SUCCESS: success
+ *                   others: fail
+ */
 bt_status_t btc_transfer_context(btc_msg_t *msg, void *arg, int arg_len, btc_arg_deep_copy_t copy_func)
 {
     btc_msg_t lmsg;
@@ -213,6 +222,34 @@ bt_status_t btc_transfer_context(btc_msg_t *msg, void *arg, int arg_len, btc_arg
     return btc_task_post(&lmsg, OSI_THREAD_MAX_TIMEOUT);
 
 }
+
+/**
+ * transfer an message to another module in tha same task.
+ * @param  msg       message
+ * @param  arg       paramter
+ * @return           BT_STATUS_SUCCESS: success
+ *                   others: fail
+ */
+bt_status_t btc_inter_profile_call(btc_msg_t *msg, void *arg)
+{
+    if (msg == NULL) {
+        return BT_STATUS_PARM_INVALID;
+    }
+
+    msg->arg = arg;
+    switch (msg->sig) {
+    case BTC_SIG_API_CALL:
+        profile_tab[msg->pid].btc_call(msg);
+        break;
+    case BTC_SIG_API_CB:
+        profile_tab[msg->pid].btc_cb(msg);
+        break;
+    default:
+        break;
+    }
+    return BT_STATUS_SUCCESS;
+}
+
 
 #if BTC_DYNAMIC_MEMORY
 
@@ -331,9 +368,9 @@ error_exit:;
 }
 #endif ///BTC_DYNAMIC_MEMORY
 
-int btc_init(void)
+bt_status_t btc_init(void)
 {
-    btc_thread = osi_thread_create("BTC_TASK", BTC_TASK_STACK_SIZE, BTC_TASK_PRIO, BTC_TASK_PINNED_TO_CORE, 2);
+    btc_thread = osi_thread_create(BTC_TASK_NAME, BTC_TASK_STACK_SIZE, BTC_TASK_PRIO, BTC_TASK_PINNED_TO_CORE, 2);
     if (btc_thread == NULL) {
         return BT_STATUS_NOMEM;
     }
@@ -376,5 +413,10 @@ bool btc_check_queue_is_congest(void)
     }
 
     return false;
+}
+
+int get_btc_work_queue_size(void)
+{
+    return osi_thread_queue_wait_size(btc_thread, 0);
 }
 

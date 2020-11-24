@@ -237,7 +237,7 @@ struct bt_mesh_prov_ctx {
     u16_t curr_net_idx;
 
     /* Current flags going to be used in provisioning data */
-    u16_t curr_flags;
+    u8_t  curr_flags;
 
     /* Current iv_index going to be used in provisioning data */
     u16_t curr_iv_index;
@@ -1001,18 +1001,10 @@ int bt_mesh_provisioner_prov_device_with_addr(const u8_t uuid[16], const u8_t ad
 
 int bt_mesh_provisioner_delete_device(struct bt_mesh_device_delete *del_dev)
 {
-    /**
-     * Three Situations:
-     * 1. device is not being/been provisioned, just remove from device queue.
-     * 2. device is being provisioned, need to close link & remove from device queue.
-     * 3. device is been provisioned, need to send config_node_reset and may need to
-     *    remove from device queue. config _node_reset can be added in function
-     *    provisioner_reset_node() in provisioner_main.c.
-     */
     bt_mesh_addr_t del_addr = {0};
-    u8_t zero[16] = {0};
     bool addr_match = false;
     bool uuid_match = false;
+    u8_t zero[16] = {0};
     int addr_cmp = 0;
     int uuid_cmp = 0;
     u16_t i = 0U;
@@ -1046,7 +1038,7 @@ int bt_mesh_provisioner_delete_device(struct bt_mesh_device_delete *del_dev)
     for (i = 0U; i < ARRAY_SIZE(link); i++) {
         if (addr_cmp && (del_dev->addr_type <= BLE_MESH_ADDR_RANDOM)) {
             if (!memcmp(link[i].addr.val, del_dev->addr, BLE_MESH_ADDR_LEN) &&
-                    link[i].addr.type == del_dev->addr_type) {
+                link[i].addr.type == del_dev->addr_type) {
                 addr_match = true;
             }
         }
@@ -1059,15 +1051,6 @@ int bt_mesh_provisioner_delete_device(struct bt_mesh_device_delete *del_dev)
             close_link(i, CLOSE_REASON_FAILED);
             break;
         }
-    }
-
-    /* Third: find if the device is been provisioned */
-    if (addr_cmp && (del_dev->addr_type <= BLE_MESH_ADDR_RANDOM)) {
-        bt_mesh_provisioner_delete_node_with_dev_addr(&del_addr);
-    }
-
-    if (uuid_cmp) {
-        bt_mesh_provisioner_delete_node_with_uuid(del_dev->uuid);
     }
 
     return 0;
@@ -1128,14 +1111,17 @@ int bt_mesh_provisioner_set_prov_data_info(struct bt_mesh_prov_data_info *info)
     return 0;
 }
 
-int bt_mesh_provisioner_set_prov_info(void)
+int bt_mesh_provisioner_init_prov_info(void)
 {
-    const struct bt_mesh_comp *comp = NULL;
-
     if (prov_ctx.primary_addr == BLE_MESH_ADDR_UNASSIGNED) {
         /* If unicast address of primary element of Provisioner has not been set
          * before, then the following initialization procedure will be used.
          */
+        if (prov == NULL) {
+            BT_ERR("No provisioning context provided");
+            return -EINVAL;
+        }
+
         if (!BLE_MESH_ADDR_IS_UNICAST(prov->prov_unicast_addr) ||
             !BLE_MESH_ADDR_IS_UNICAST(prov->prov_start_address)) {
             BT_ERR("Invalid address, own 0x%04x, start 0x%04x",
@@ -1143,7 +1129,7 @@ int bt_mesh_provisioner_set_prov_info(void)
             return -EINVAL;
         }
 
-        comp = bt_mesh_comp_get();
+        const struct bt_mesh_comp *comp = bt_mesh_comp_get();
         if (!comp) {
             BT_ERR("Invalid composition data");
             return -EINVAL;
@@ -1156,15 +1142,19 @@ int bt_mesh_provisioner_set_prov_info(void)
         } else {
             prov_ctx.curr_alloc_addr = prov->prov_start_address;
         }
+
+        /* Update primary element address with the initialized value here. */
         prov_ctx.primary_addr = prov->prov_unicast_addr;
 
         if (IS_ENABLED(CONFIG_BLE_MESH_SETTINGS)) {
             bt_mesh_store_prov_info(prov_ctx.primary_addr, prov_ctx.curr_alloc_addr);
         }
     }
+
     prov_ctx.curr_net_idx = BLE_MESH_KEY_PRIMARY;
-    prov_ctx.curr_flags = prov->flags;
-    prov_ctx.curr_iv_index = prov->iv_index;
+    struct bt_mesh_subnet *sub = bt_mesh_provisioner_subnet_get(BLE_MESH_KEY_PRIMARY);
+    prov_ctx.curr_flags = bt_mesh_net_flags(sub);
+    prov_ctx.curr_iv_index = bt_mesh.iv_index;
 
     return 0;
 }
@@ -1241,7 +1231,8 @@ int bt_mesh_provisioner_set_primary_elem_addr(u16_t addr)
     if (addr + comp->elem_count > prov_ctx.curr_alloc_addr) {
         prov_ctx.curr_alloc_addr = addr + comp->elem_count;
     }
-    BT_INFO("Provisioner primary address updated, old 0x%04x, new 0x%04x", prov_ctx.primary_addr, addr);
+
+    BT_INFO("Primary address updated, old 0x%04x, new 0x%04x", prov_ctx.primary_addr, addr);
     prov_ctx.primary_addr = addr;
 
     if (IS_ENABLED(CONFIG_BLE_MESH_SETTINGS)) {

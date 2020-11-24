@@ -69,9 +69,13 @@ def main():
     # functions and this way makes Python 2 compatibility really tough if there is any code that assumes text files contain strings (kconfiglib assumes this).
     # The reason for that is that you need to import io.open() to support the encoding argument on Python 2, and this function always uses Py2's unicode
     # type not the str type.
-    if 'UTF-8' not in locale.getlocale():
-        raise RuntimeError("build_docs.py requires the default locale's encoding to be UTF-8. " +
-                           "Setting environment variable LC_ALL=C.UTF-8 when running build_docs.py may be enough to fix this.")
+    if ('UTF-8' not in locale.getlocale()) and ('utf8' not in locale.getlocale()):
+        raise RuntimeError("build_docs.py requires the default locale's encoding to be UTF-8.\n" +
+                           " - Linux. Setting environment variable LC_ALL=C.UTF-8 when running build_docs.py may be " +
+                           "enough to fix this.\n"
+                           " - Windows. Possible solution for the Windows 10 starting version 1803. Go to " +
+                           "Control Panel->Clock and Region->Region->Administrative->Change system locale...; " +
+                           "Check `Beta: Use Unicode UTF-8 for worldwide language support` and reboot")
 
     parser = argparse.ArgumentParser(description='build_docs.py: Build IDF docs', prog='build_docs.py')
 
@@ -384,12 +388,12 @@ def check_docs(language, target, log_file, known_warnings_file, out_sanitized_lo
 
 
 def action_linkcheck(args):
+    args.builders = "linkcheck"
     return parallel_call(args, call_linkcheck)
 
 
 def call_linkcheck(entry):
-    # Remove the last entry which the buildername, since the linkcheck builder is not supplied through the builder list argument
-    return sphinx_call(*entry[:4], buildername="linkcheck")
+    return sphinx_call(*entry)
 
 
 # https://github.com/espressif/esp-idf/tree/
@@ -397,8 +401,9 @@ def call_linkcheck(entry):
 # https://github.com/espressif/esp-idf/raw/
 GH_LINK_RE = r"https://github.com/espressif/esp-idf/(?:tree|blob|raw)/[^\s]+"
 
-# we allow this one link, because we always want users to see the latest support policy
-GH_LINK_ALLOWED = ["https://github.com/espressif/esp-idf/blob/master/SUPPORT_POLICY.md"]
+# we allow this one doc, because we always want users to see the latest support policy
+GH_LINK_ALLOWED = ["https://github.com/espressif/esp-idf/blob/master/SUPPORT_POLICY.md",
+                   "https://github.com/espressif/esp-idf/blob/master/SUPPORT_POLICY_CN.md"]
 
 
 def action_gh_linkcheck(args):

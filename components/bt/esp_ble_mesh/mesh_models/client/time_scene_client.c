@@ -349,7 +349,7 @@ static void time_scene_status(struct bt_mesh_model *model,
     return;
 }
 
-const struct bt_mesh_model_op time_cli_op[] = {
+const struct bt_mesh_model_op bt_mesh_time_cli_op[] = {
     { BLE_MESH_MODEL_OP_TIME_STATUS,          5, time_scene_status },
     { BLE_MESH_MODEL_OP_TIME_ZONE_STATUS,     7, time_scene_status },
     { BLE_MESH_MODEL_OP_TAI_UTC_DELTA_STATUS, 9, time_scene_status },
@@ -357,13 +357,13 @@ const struct bt_mesh_model_op time_cli_op[] = {
     BLE_MESH_MODEL_OP_END,
 };
 
-const struct bt_mesh_model_op scene_cli_op[] = {
+const struct bt_mesh_model_op bt_mesh_scene_cli_op[] = {
     { BLE_MESH_MODEL_OP_SCENE_STATUS,          3, time_scene_status },
     { BLE_MESH_MODEL_OP_SCENE_REGISTER_STATUS, 3, time_scene_status },
     BLE_MESH_MODEL_OP_END,
 };
 
-const struct bt_mesh_model_op scheduler_cli_op[] = {
+const struct bt_mesh_model_op bt_mesh_scheduler_cli_op[] = {
     { BLE_MESH_MODEL_OP_SCHEDULER_STATUS,     2,  time_scene_status },
     { BLE_MESH_MODEL_OP_SCHEDULER_ACT_STATUS, 10, time_scene_status },
     BLE_MESH_MODEL_OP_END,
@@ -372,7 +372,6 @@ const struct bt_mesh_model_op scheduler_cli_op[] = {
 static int time_scene_get_state(bt_mesh_client_common_param_t *common, void *value)
 {
     NET_BUF_SIMPLE_DEFINE(msg, BLE_MESH_SCENE_GET_STATE_MSG_LEN);
-    int err = 0;
 
     bt_mesh_model_msg_init(&msg, common->opcode);
 
@@ -390,14 +389,7 @@ static int time_scene_get_state(bt_mesh_client_common_param_t *common, void *val
         }
     }
 
-    err = bt_mesh_client_send_msg(common->model, common->opcode, &common->ctx, &msg,
-                                  timeout_handler, common->msg_timeout, true,
-                                  common->cb, common->cb_data);
-    if (err) {
-        BT_ERR("Failed to send Time Scene Get message (err %d)", err);
-    }
-
-    return err;
+    return bt_mesh_client_send_msg(common, &msg, true, timeout_handler);
 }
 
 static int time_scene_set_state(bt_mesh_client_common_param_t *common,
@@ -485,20 +477,14 @@ static int time_scene_set_state(bt_mesh_client_common_param_t *common,
         goto end;
     }
 
-    err = bt_mesh_client_send_msg(common->model, common->opcode, &common->ctx, msg,
-                                  timeout_handler, common->msg_timeout, need_ack,
-                                  common->cb, common->cb_data);
-    if (err) {
-        BT_ERR("Failed to send Time Scene Set message (err %d)", err);
-    }
+    err = bt_mesh_client_send_msg(common, msg, need_ack, timeout_handler);
 
 end:
     bt_mesh_free_buf(msg);
     return err;
 }
 
-int bt_mesh_time_scene_client_get_state(bt_mesh_client_common_param_t *common,
-                                        void *get, void *status)
+int bt_mesh_time_scene_client_get_state(bt_mesh_client_common_param_t *common, void *get)
 {
     bt_mesh_time_scene_client_t *client = NULL;
 
@@ -536,8 +522,7 @@ int bt_mesh_time_scene_client_get_state(bt_mesh_client_common_param_t *common,
     return time_scene_get_state(common, get);
 }
 
-int bt_mesh_time_scene_client_set_state(bt_mesh_client_common_param_t *common,
-                                        void *set, void *status)
+int bt_mesh_time_scene_client_set_state(bt_mesh_client_common_param_t *common, void *set)
 {
     bt_mesh_time_scene_client_t *client = NULL;
     u16_t length = 0U;
@@ -645,21 +630,19 @@ int bt_mesh_time_scene_client_set_state(bt_mesh_client_common_param_t *common,
     return time_scene_set_state(common, set, length, need_ack);
 }
 
-static int time_scene_client_init(struct bt_mesh_model *model, bool primary)
+static int time_scene_client_init(struct bt_mesh_model *model)
 {
     time_scene_internal_data_t *internal = NULL;
     bt_mesh_time_scene_client_t *client = NULL;
 
-    BT_DBG("primary %u", primary);
-
     if (!model) {
-        BT_ERR("%s, Invalid parameter", __func__);
+        BT_ERR("Invalid Time Scene client model");
         return -EINVAL;
     }
 
     client = (bt_mesh_time_scene_client_t *)model->user_data;
     if (!client) {
-        BT_ERR("Invalid Time Scene client user data");
+        BT_ERR("No Time Scene client context provided");
         return -EINVAL;
     }
 
@@ -685,33 +668,18 @@ static int time_scene_client_init(struct bt_mesh_model *model, bool primary)
     return 0;
 }
 
-int bt_mesh_time_cli_init(struct bt_mesh_model *model, bool primary)
-{
-    return time_scene_client_init(model, primary);
-}
-
-int bt_mesh_scene_cli_init(struct bt_mesh_model *model, bool primary)
-{
-    return time_scene_client_init(model, primary);
-}
-
-int bt_mesh_scheduler_cli_init(struct bt_mesh_model *model, bool primary)
-{
-    return time_scene_client_init(model, primary);
-}
-
-static int time_scene_client_deinit(struct bt_mesh_model *model, bool primary)
+static int time_scene_client_deinit(struct bt_mesh_model *model)
 {
     bt_mesh_time_scene_client_t *client = NULL;
 
     if (!model) {
-        BT_ERR("%s, Invalid parameter", __func__);
+        BT_ERR("Invalid Time Scene client model");
         return -EINVAL;
     }
 
     client = (bt_mesh_time_scene_client_t *)model->user_data;
     if (!client) {
-        BT_ERR("Invalid Time Scene client user data");
+        BT_ERR("No Time Scene client context provided");
         return -EINVAL;
     }
 
@@ -729,17 +697,7 @@ static int time_scene_client_deinit(struct bt_mesh_model *model, bool primary)
     return 0;
 }
 
-int bt_mesh_time_cli_deinit(struct bt_mesh_model *model, bool primary)
-{
-    return time_scene_client_deinit(model, primary);
-}
-
-int bt_mesh_scene_cli_deinit(struct bt_mesh_model *model, bool primary)
-{
-    return time_scene_client_deinit(model, primary);
-}
-
-int bt_mesh_scheduler_cli_deinit(struct bt_mesh_model *model, bool primary)
-{
-    return time_scene_client_deinit(model, primary);
-}
+const struct bt_mesh_model_cb bt_mesh_time_scene_client_cb = {
+    .init = time_scene_client_init,
+    .deinit = time_scene_client_deinit,
+};

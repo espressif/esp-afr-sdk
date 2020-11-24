@@ -39,7 +39,7 @@
     # first test if config file exists, if not exist, exit 0
     - test -e $CONFIG_FILE || exit 0
     # clone test env configs
-    - git clone $TEST_ENV_CONFIG_REPOSITORY
+    - ./tools/ci/retry_failed.sh git clone $TEST_ENV_CONFIG_REPO
     - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
     - cd tools/ci/python_packages/tiny_test_fw/bin
     # run test
@@ -77,7 +77,7 @@
     # first test if config file exists, if not exist, exit 0
     - test -e $CONFIG_FILE || exit 0
     # clone test env configs
-    - git clone $TEST_ENV_CONFIG_REPOSITORY
+    - ./tools/ci/retry_failed.sh git clone $TEST_ENV_CONFIG_REPO
     - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
     - cd tools/ci/python_packages/tiny_test_fw/bin
     # run test
@@ -156,22 +156,27 @@
     SUBMODULES_TO_FETCH: "components/esptool_py/esptool"
     LOCAL_ENV_CONFIG_PATH: "$CI_PROJECT_DIR/ci-test-runner-configs/$CI_RUNNER_DESCRIPTION/ESP32_IDF"
     LOG_PATH: "${CI_PROJECT_DIR}/${CI_COMMIT_SHA}"
-    TEST_CASE_FILE_PATH: "$CI_PROJECT_DIR/components/idf_test/integration_test"
+    TEST_CASE_FILE_PATH: "$CI_PROJECT_DIR/auto_test_script/TestCaseFiles"
     MODULE_UPDATE_FILE: "$CI_PROJECT_DIR/components/idf_test/ModuleDefinition.yml"
     CONFIG_FILE_PATH: "${CI_PROJECT_DIR}/components/idf_test/integration_test/CIConfigs"
+    KNOWN_ISSUE_FILE: "${CI_PROJECT_DIR}/components/idf_test/integration_test/KnownIssues"
+    PYTHON_VER: 3.7.7
   script:
     - *define_config_file_name
     # first test if config file exists, if not exist, exit 0
     - test -e $CONFIG_FILE || exit 0
     # clone local test env configs
-    - git clone $TEST_ENV_CONFIG_REPOSITORY
+    - ./tools/ci/retry_failed.sh git clone $TEST_ENV_CONFIG_REPO
     - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
-    # clone test bench
-    - git clone $TEST_SCRIPT_REPOSITORY
+    # clone auto test repo
+    - git clone ${CI_AUTO_TEST_SCRIPT_REPO_URL} -b empty_branch
+    - ./tools/ci/retry_failed.sh git -C auto_test_script checkout -f ${CI_AUTO_TEST_SCRIPT_REPO_BRANCH}
     - python $CHECKOUT_REF_SCRIPT auto_test_script auto_test_script
+    - export PYTHONPATH="${CI_PROJECT_DIR}/auto_test_script/packages:$PYTHONPATH"
     - cd auto_test_script
     # run test
-    - python CIRunner.py -l "$LOG_PATH/$JOB_FULL_NAME" -c $CONFIG_FILE -e $LOCAL_ENV_CONFIG_PATH -t $TEST_CASE_FILE_PATH
+    - cat ${KNOWN_ISSUE_FILE} >> ${TEST_CASE_FILE_PATH}/KnownIssues
+    - python bin/CIRunner.py -l "$LOG_PATH/$JOB_FULL_NAME" -c $CONFIG_FILE -e $LOCAL_ENV_CONFIG_PATH -t $TEST_CASE_FILE_PATH
 
 test_weekend_mqtt:
   extends: .example_test_template
@@ -240,7 +245,7 @@ example_test_002:
     # first test if config file exists, if not exist, exit 0
     - test -e $CONFIG_FILE || exit 0
     # clone test env configs
-    - git clone $TEST_ENV_CONFIG_REPOSITORY
+    - ./tools/ci/retry_failed.sh git clone $TEST_ENV_CONFIG_REPO
     - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
     - cd tools/ci/python_packages/tiny_test_fw/bin
     # run test
@@ -257,13 +262,13 @@ example_test_004A:
   extends: .example_test_template
   tags:
     - ESP32
-    - Example_CAN1
+    - Example_TWAI1
 
 example_test_004B:
   extends: .example_test_template
   tags:
     - ESP32
-    - Example_CAN2
+    - Example_TWAI2
 
 example_test_005:
   extends: .example_test_template
@@ -383,7 +388,7 @@ test_app_test_003:
 
 UT_001:
   extends: .unit_test_template
-  parallel: 38
+  parallel: 39
   tags:
     - ESP32_IDF
     - UT_T1_1
@@ -546,7 +551,7 @@ UT_034:
 
 UT_035:
   extends: .unit_test_s2_template
-  parallel: 36
+  parallel: 38
   tags:
     - ESP32S2_IDF
     - UT_T1_1
@@ -609,16 +614,18 @@ nvs_compatible_test:
     # first test if config file exists, if not exist, exit 0
     - test -e $CONFIG_FILE || exit 0
     # clone local test env configs
-    - git clone $TEST_ENV_CONFIG_REPOSITORY
+    - ./tools/ci/retry_failed.sh git clone $TEST_ENV_CONFIG_REPO
     - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
     # clone test bench
-    - git clone $TEST_SCRIPT_REPOSITORY
+    - git clone ${CI_AUTO_TEST_SCRIPT_REPO_URL} -b empty_branch
+    - ./tools/ci/retry_failed.sh git -C auto_test_script checkout -f ${CI_AUTO_TEST_SCRIPT_REPO_BRANCH}
     - python $CHECKOUT_REF_SCRIPT auto_test_script auto_test_script
+    - export PYTHONPATH="${CI_PROJECT_DIR}/auto_test_script/packages:$PYTHONPATH"
     - cd auto_test_script
     # prepare nvs bins
-    - ./Tools/prepare_nvs_bin.sh
+    - ./tools/prepare_nvs_bin.sh
     # run test
-    - python CIRunner.py -l "$LOG_PATH/$JOB_FULL_NAME" -c $CONFIG_FILE -e $LOCAL_ENV_CONFIG_PATH -t $TEST_CASE_FILE_PATH
+    - python bin/CIRunner.py -l "$LOG_PATH/$JOB_FULL_NAME" -c $CONFIG_FILE -e $LOCAL_ENV_CONFIG_PATH -t $TEST_CASE_FILE_PATH
 
 IT_001:
   extends: .test_template
@@ -635,7 +642,7 @@ IT_002:
 
 IT_003:
   extends: .test_template
-  parallel: 13
+  parallel: 14
   tags:
     - ESP32_IDF
     - SSC_T2_5
@@ -655,7 +662,7 @@ IT_005:
 
 IT_006:
   extends: .test_template
-  parallel: 8
+  parallel: 12
   tags:
     - ESP32_IDF
     - SSC_T1_6
@@ -678,13 +685,6 @@ IT_009:
   tags:
     - ESP32_IDF
     - SSC_T1_3
-
-IT_010:
-  extends: .test_template
-  parallel: 4
-  tags:
-    - ESP32_IDF
-    - SSC_T5_1
 
 IT_011:
   extends: .test_template
@@ -719,6 +719,7 @@ IT_015:
 
 IT_016:
   extends: .test_template
+  allow_failure: true
   tags:
     - ESP32_IDF
     - SSC_T50_MESH1
@@ -731,7 +732,6 @@ IT_017:
 
 IT_018:
   extends: .test_template
-  parallel: 2
   tags:
     - ESP32_IDF
     - SSC_T1_9

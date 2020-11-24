@@ -317,6 +317,7 @@ Linux 和 MacOS 操作系统
 .. code-block:: bash
 
     cd ~/esp/hello_world
+    idf.py set-target {IDF_TARGET_PATH_NAME}
     idf.py menuconfig
 
 Windows 操作系统
@@ -325,9 +326,10 @@ Windows 操作系统
 .. code-block:: batch
 
     cd %userprofile%\esp\hello_world
+    idf.py set-target {IDF_TARGET_PATH_NAME}
     idf.py menuconfig
 
-打开一个新项目后，应首先设置“目标”芯片 ``idf.py set-target {IDF_TARGET}``。注意，此操作将清除并初始化项目之前的编译和配置（如有）。 您也可以直接将“目标”配置为环境变量（此时可跳过该步骤）。更多信息，请见 :ref:`selecting-idf-target`。
+打开一个新项目后，应首先设置“目标”芯片 ``idf.py set-target {IDF_TARGET_PATH_NAME}``。注意，此操作将清除并初始化项目之前的编译和配置（如有）。 您也可以直接将“目标”配置为环境变量（此时可跳过该步骤）。更多信息，请见 :ref:`selecting-idf-target`。
 
 如果之前的步骤都正确，则会显示下面的菜单：
 
@@ -393,7 +395,7 @@ Windows 操作系统
 第九步：烧录到设备
 =============================
 
-请使用以下命令，将刚刚生成的二进制文件烧录至您的 {IDF_TARGET_NAME} 开发板：
+请使用以下命令，将刚刚生成的二进制文件烧录 (bootloader.bin, partition-table.bin 和 hello-world.bin)  至您的 {IDF_TARGET_NAME} 开发板：
 
     ``idf.py -p PORT [-b BAUD] flash``
 
@@ -529,6 +531,7 @@ Windows 操作系统
 
     establish-serial-connection
     eclipse-setup
+    vscode-setup
     ../api-guides/tools/idf-monitor
     toolchain-setup-scratch
     :esp32: ../get-started-legacy/index

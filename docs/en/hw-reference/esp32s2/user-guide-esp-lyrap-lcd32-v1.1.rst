@@ -1,10 +1,14 @@
-===============
-ESP-LyraP-LCD32
-===============
+====================
+ESP-LyraP-LCD32 v1.1
+====================
 
 :link_to_translation:`zh_CN:[中文]`
 
-This user guide provides information on the ESP-LyraP-LCD32 extension board. This board cannot be bought separately and is usually sold together with other Espressif development boards (e.g., ESP32-S2-Kaluga-1), which will be referred to as *main boards* below.
+This user guide provides information on the ESP-LyraP-LCD32 extension board.
+
+This extension board cannot be bought separately and is usually sold together with other Espressif development boards (e.g., ESP32-S2-Kaluga-1), which will be referred to as *main boards* below.
+
+Currently, ESP-LyraP-LCD32 v1.1 is sold as part of the :doc:`user-guide-esp32-s2-kaluga-1-kit-v1.2`.
 
 The ESP-LyraP-LCD32 extends the functionality of your main board by adding an LCD graphic display.
 
@@ -58,7 +62,7 @@ In the description of components below, **Reserved** means that the functionalit
    * - Extension Header
      - Male Extension Header for mounting onto a female Extension Header
    * - LCD display
-     - This version has a 3.2" 320x240 SPI LCD display module
+     - This version has a 3.2" 320x240 SPI LCD display module; the display driver/controller is Sitronix ST7789V
    * - Touch Screen Switch
      - No support for touch screens, keep the switches to OFF to make the pins available for other uses
    * - Main Board 3.2" LCD FPC Connector
@@ -94,7 +98,7 @@ To mount your ESP-LyraP-LCD32 onto the board with a female Extension Header:
 Software Setup
 ^^^^^^^^^^^^^^
 
-See Section :ref:`user-guide-esp32-s2-kaluga-1-kit-software-setup` of the ESP32-S2-Kaluga-1 kit user guide.
+See Section :ref:`user-guide-esp32-s2-kaluga-1-kit-v1.2-software-setup` of the ESP32-S2-Kaluga-1 kit user guide.
 
 
 Hardware Reference
