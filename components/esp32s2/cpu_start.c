@@ -437,10 +437,23 @@ static void main_task(void *args)
 
     // Now that the application is about to start, disable boot watchdog
 #ifndef CONFIG_BOOTLOADER_WDT_DISABLE_IN_USER_CODE
-    wdt_hal_context_t rtc_wdt_ctx = {.inst = WDT_RWDT, .rwdt_dev = &RTCCNTL};
-    wdt_hal_write_protect_disable(&rtc_wdt_ctx);
-    wdt_hal_disable(&rtc_wdt_ctx);
-    wdt_hal_write_protect_enable(&rtc_wdt_ctx);
+#ifdef CONFIG_BOOTLOADER_WDT_DISABLE_SKIP_FIRST_BOOT
+    bool image_first_boot = false;
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(esp_ota_get_running_partition(), &ota_state) == ESP_OK) {
+        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+            image_first_boot = true;
+        }
+    }
+    if (!image_first_boot) {
+#endif // CONFIG_BOOTLOADER_WDT_DISABLE_SKIP_FIRST_BOOT
+        wdt_hal_context_t rtc_wdt_ctx = {.inst = WDT_RWDT, .rwdt_dev = &RTCCNTL};
+        wdt_hal_write_protect_disable(&rtc_wdt_ctx);
+        wdt_hal_disable(&rtc_wdt_ctx);
+        wdt_hal_write_protect_enable(&rtc_wdt_ctx);
+#ifdef CONFIG_BOOTLOADER_WDT_DISABLE_SKIP_FIRST_BOOT
+    }
+#endif // CONFIG_BOOTLOADER_WDT_DISABLE_SKIP_FIRST_BOOT
 #endif
 
 #ifdef CONFIG_BOOTLOADER_EFUSE_SECURE_VERSION_EMULATE
