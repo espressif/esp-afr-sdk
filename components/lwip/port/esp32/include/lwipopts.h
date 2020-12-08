@@ -512,7 +512,12 @@
  * LWIP_TCPIP_CORE_LOCKING: (EXPERIMENTAL!)
  * Don't use it if you're not an active lwIP project member
  */
+#ifdef CONFIG_LWIP_TCPIP_CORE_LOCKING
+#define LWIP_TCPIP_CORE_LOCKING         1
+#else
 #define LWIP_TCPIP_CORE_LOCKING         0
+#endif
+
 
 /*
    ------------------------------------
@@ -573,6 +578,12 @@
  * LWIP_STATS==1: Enable statistics collection in lwip_stats.
  */
 #define LWIP_STATS                      CONFIG_LWIP_STATS
+
+#ifdef CONFIG_MIB2_STATS
+#define MIB2_STATS                      1
+#else
+#define MIB2_STATS                      0
+#endif
 
 #if LWIP_STATS
 

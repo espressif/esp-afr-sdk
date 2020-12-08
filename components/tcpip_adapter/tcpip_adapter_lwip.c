@@ -70,6 +70,7 @@ static sys_sem_t api_lock_sem = NULL;
 extern sys_thread_t g_lwip_task;
 static const char* TAG = "tcpip_adapter";
 
+#if !LWIP_TCPIP_CORE_LOCKING
 static void tcpip_adapter_api_cb(void* api_msg)
 {
     tcpip_adapter_api_msg_t *msg = (tcpip_adapter_api_msg_t*)api_msg;
@@ -85,6 +86,7 @@ static void tcpip_adapter_api_cb(void* api_msg)
 
     return;
 }
+#endif
 
 static void tcpip_adapter_dhcps_cb(u8_t client_ip[4])
 {
@@ -134,7 +136,7 @@ static inline netif_init_fn tcpip_if_to_netif_init_fn(tcpip_adapter_if_t tcpip_i
 
 static int tcpip_adapter_ipc_check(tcpip_adapter_api_msg_t *msg)
 {
-#if TCPIP_ADAPTER_TRHEAD_SAFE
+#if TCPIP_ADAPTER_TRHEAD_SAFE && !LWIP_TCPIP_CORE_LOCKING
     xTaskHandle local_task = xTaskGetCurrentTaskHandle();
 
     if (local_task == g_lwip_task) {

@@ -105,11 +105,24 @@ menu "LWIP"
         help
             Enabling this option allows reassemblying incoming fragmented IP packets.
 
+    config LWIP_TCPIP_CORE_LOCKING
+        bool "Enable TCPIP core locking"
+        default n
+        help
+            Enabling this option enables TCPIP core locking support in LwIP
+
     config LWIP_STATS
         bool "Enable LWIP statistics"
         default n
         help
             Enabling this option allows LWIP statistics
+
+    config MIB2_STATS
+        bool "Enable MIB2 statistics"
+        default n
+        depends on LWIP_STATS
+        help
+            Enabling this option allows MIB2 statistics
 
     config LWIP_ETHARP_TRUST_IP_MAC
         bool "Enable LWIP ARP trust"
