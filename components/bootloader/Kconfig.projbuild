@@ -249,7 +249,6 @@ endmenu  # Bootloader
 
 
 menu "Security features"
-    visible if !IDF_CMAKE
 
     # These three are the actual options to check in code,
     # selected by the displayed options
