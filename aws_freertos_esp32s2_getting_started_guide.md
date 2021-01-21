@@ -36,7 +36,7 @@ cmake -DVENDOR=espressif -DBOARD=esp32s2_saola_1 -DCOMPILER=xtensa-esp32s2 -S . 
 ### To build the application
 Use Espressif's IDF utility to build the application:
 ```
-./vendors/espressif/esp-idf/tools/idf.py build
+./vendors/espressif/esp-idf/tools/idf.py -B build-directory build
 ```
 
 Or use the generic CMake interface to build the application:
@@ -48,17 +48,17 @@ cmake --build build-directory
 Use Espressif's IDF utility (freertos/vendors/espressif/esp-idf/tools/idf.py) to flash your board, run the application, and see logs.
 To erase the board's flash, go to the freertos directory and use the following command:
 ```
-./vendors/espressif/esp-idf/tools/idf.py erase_flash -B build-directory
+./vendors/espressif/esp-idf/tools/idf.py -B build-directory erase_flash
 ```
 
 You can use the IDF script to flash your board:
 ```
-./vendors/espressif/esp-idf/tools/idf.py flash -B build-directory
+./vendors/espressif/esp-idf/tools/idf.py -B build-directory flash
 ```
 
 To monitor:
 ```
-./vendors/espressif/esp-idf/tools/idf.py monitor -p /dev/ttyUSB1 -B build-directory
+./vendors/espressif/esp-idf/tools/idf.py -B build-directory monitor -p /dev/ttyUSB1
 ```
 
 ## Troubleshooting
