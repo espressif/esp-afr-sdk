@@ -64,7 +64,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         case WIFI_EVENT_STA_DISCONNECTED:
             ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED");
             if (s_retry_num < MAX_RETRY_ATTEMPTS) {
-                ESP_ERROR_CHECK(esp_wifi_connect());
+                esp_wifi_connect();
                 s_retry_num++;
             } else if (ap_idx < s_ap_creds_num) {
                 /* Try the next AP credential if first one fails */
@@ -72,8 +72,8 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                 if (ap_idx < s_ap_creds_num) {
                     ESP_LOGI(TAG, "Connecting to SSID: %s, Passphrase: %s",
                              wps_ap_creds[ap_idx].sta.ssid, wps_ap_creds[ap_idx].sta.password);
-                    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wps_ap_creds[ap_idx++]) );
-                    ESP_ERROR_CHECK(esp_wifi_connect());
+                    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wps_ap_creds[ap_idx++]) );
+                    esp_wifi_connect();
                 }
                 s_retry_num = 0;
             } else {
@@ -99,7 +99,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                     /* If multiple AP credentials are received from WPS, connect with first one */
                     ESP_LOGI(TAG, "Connecting to SSID: %s, Passphrase: %s",
                              wps_ap_creds[0].sta.ssid, wps_ap_creds[0].sta.password);
-                    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wps_ap_creds[0]) );
+                    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wps_ap_creds[0]) );
                 }
                 /*
                  * If only one AP credential is received from WPS, there will be no event data and
@@ -107,7 +107,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                  * with legacy apps. So directly attempt connection here.
                  */
                 ESP_ERROR_CHECK(esp_wifi_wps_disable());
-                ESP_ERROR_CHECK(esp_wifi_connect());
+                esp_wifi_connect();
             }
             break;
         case WIFI_EVENT_STA_WPS_ER_FAILED:

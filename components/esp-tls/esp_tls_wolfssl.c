@@ -157,6 +157,11 @@ static esp_err_t set_client_config(const char *hostname, size_t hostlen, esp_tls
         return ESP_ERR_WOLFSSL_CTX_SETUP_FAILED;
     }
 
+    if (cfg->crt_bundle_attach != NULL) {
+        ESP_LOGE(TAG,"use_crt_bundle not supported in wolfssl");
+        return ESP_FAIL;
+    }
+
     if (cfg->use_global_ca_store == true) {
         if ((esp_load_wolfssl_verify_buffer(tls, global_cacert, global_cacert_pem_bytes, FILE_TYPE_CA_CERT, &ret)) != ESP_OK) {
             ESP_LOGE(TAG, "Error in loading certificate verify buffer, returned %d", ret);
@@ -218,11 +223,6 @@ static esp_err_t set_client_config(const char *hostname, size_t hostlen, esp_tls
         return ESP_FAIL;
     }
 
-    if (cfg->crt_bundle_attach != NULL) {
-        ESP_LOGE(TAG,"use_crt_bundle not supported in wolfssl");
-        return ESP_FAIL;
-    }
-
     tls->priv_ssl =(void *)wolfSSL_new( (WOLFSSL_CTX *)tls->priv_ctx);
     if (!tls->priv_ssl) {
         ESP_LOGE(TAG, "Create wolfSSL failed");
@@ -241,8 +241,8 @@ static esp_err_t set_client_config(const char *hostname, size_t hostlen, esp_tls
             return ESP_ERR_NO_MEM;
         }
         /* Hostname set here should match CN in server certificate */
-        if ((ret = wolfSSL_set_tlsext_host_name( (WOLFSSL *)tls->priv_ssl, use_host))!= WOLFSSL_SUCCESS) {
-            ESP_LOGE(TAG, "wolfSSL_set_tlsext_host_name returned -0x%x", -ret);
+        if ((ret = (wolfSSL_check_domain_name( (WOLFSSL *)tls->priv_ssl, use_host))) != WOLFSSL_SUCCESS) {
+            ESP_LOGE(TAG, "wolfSSL_check_domain_name returned -0x%x", -ret);
             ESP_INT_EVENT_TRACKER_CAPTURE(tls->error_handle, ERR_TYPE_WOLFSSL, -ret);
             free(use_host);
             return ESP_ERR_WOLFSSL_SSL_SET_HOSTNAME_FAILED;

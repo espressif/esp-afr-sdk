@@ -765,6 +765,7 @@ typedef struct {
     FLOW_SPEC flow;
     UINT16 handle;
     UINT8 status;
+    BD_ADDR     rem_bda;
 } tBTM_QOS_SETUP_CMPL;
 
 
@@ -1450,6 +1451,7 @@ typedef UINT8 tBTM_IO_CAP;
 #define BTM_BLE_RESPONDER_KEY_SIZE 15
 #define BTM_BLE_MAX_KEY_SIZE       16
 #define BTM_BLE_MIN_KEY_SIZE       7
+#define BTM_BLE_APPL_ENC_KEY_SIZE  7
 
 typedef UINT8 tBTM_AUTH_REQ;
 

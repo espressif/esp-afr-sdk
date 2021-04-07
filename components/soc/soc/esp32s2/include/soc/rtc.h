@@ -102,7 +102,7 @@ extern "C" {
 #define RTC_CNTL_PLL_BUF_WAIT_DEFAULT  20
 #define RTC_CNTL_XTL_BUF_WAIT_DEFAULT  100
 #define RTC_CNTL_CK8M_WAIT_DEFAULT  20
-#define RTC_CK8M_ENABLE_WAIT_DEFAULT 1
+#define RTC_CK8M_ENABLE_WAIT_DEFAULT 5
 
 #define RTC_CNTL_CK8M_DFREQ_DEFAULT 172
 #define RTC_CNTL_SCK_DCAP_DEFAULT   255
@@ -238,9 +238,9 @@ typedef struct {
 } x32k_config_t;
 
 #define X32K_CONFIG_DEFAULT() { \
-    .dac = 1, \
+    .dac = 3, \
     .dres = 3, \
-    .dgm = 0, \
+    .dgm = 3, \
     .dbuf = 1, \
 }
 
@@ -734,9 +734,35 @@ void rtc_sleep_set_wakeup_time(uint64_t t);
  *                      - RTC_CNTL_SDIO_REJECT_EN
  *                    These flags are used to prevent entering sleep when e.g.
  *                    an external host is communicating via SDIO slave
+ * @param lslp_mem_inf_fpu If non-zero then the low power config is restored
+ *                         immediately on wake. Recommended for light sleep,
+ *                         has no effect if the system goes into deep sleep.
  * @return non-zero if sleep was rejected by hardware
  */
 uint32_t rtc_sleep_start(uint32_t wakeup_opt, uint32_t reject_opt, uint32_t lslp_mem_inf_fpu);
+
+/**
+ * @brief Enter deep sleep mode
+ *
+ * Similar to rtc_sleep_start(), but additionally uses hardware to calculate the CRC value
+ * of RTC FAST memory. On wake, this CRC is used to determine if a deep sleep wake
+ * stub is valid to execute (if a wake address is set).
+ *
+ * No RAM is accessed while calculating the CRC and going into deep sleep, which makes
+ * this function safe to use even if the caller's stack is in RTC FAST memory.
+ *
+ * @note If no deep sleep wake stub address is set then calling rtc_sleep_start() will
+ * have the same effect and takes less time as CRC calculation is skipped.
+ *
+ * @note This function should only be called after rtc_sleep_init() has been called to
+ * configure the system for deep sleep.
+ *
+ * @param wakeup_opt - same as for rtc_sleep_start
+ * @param reject_opt - same as for rtc_sleep_start
+ *
+ * @return non-zero if sleep was rejected by hardware
+ */
+uint32_t rtc_deep_sleep_start(uint32_t wakeup_opt, uint32_t reject_opt);
 
 /**
  * RTC power and clock control initialization settings

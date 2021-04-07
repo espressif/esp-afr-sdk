@@ -58,6 +58,7 @@
 #define BTA_SDP_INCLUDED            TRUE
 #define BTA_DM_PM_INCLUDED          TRUE
 #define SDP_INCLUDED                TRUE
+#define BTA_DM_QOS_INCLUDED         TRUE
 
 #if (UC_BT_A2DP_ENABLED == TRUE)
 #define BTA_AR_INCLUDED             TRUE
@@ -169,6 +170,12 @@
 #else
 #define GATTC_INCLUDED              FALSE
 #endif  /* UC_BT_GATTC_ENABLE */
+
+#if (UC_BT_BLUFI_ENABLE)
+#define BLUFI_INCLUDED              TRUE
+#else
+#define BLUFI_INCLUDED              FALSE
+#endif  /* UC_BT_BLUFI_ENABLE */
 
 #if (UC_BT_GATTC_ENABLE && UC_BT_GATTC_CACHE_NVS_FLASH_ENABLED)
 #define GATTC_CACHE_NVS             TRUE
@@ -292,6 +299,10 @@
 
 #ifndef BTA_DM_PM_INCLUDED
 #define BTA_DM_PM_INCLUDED FALSE
+#endif
+
+#ifndef BTA_DM_QOS_INCLUDED
+#define BTA_DM_QOS_INCLUDED FALSE
 #endif
 
 #ifndef BTA_PAN_INCLUDED

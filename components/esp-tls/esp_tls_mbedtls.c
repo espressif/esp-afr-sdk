@@ -196,6 +196,7 @@ void esp_mbedtls_conn_delete(esp_tls_t *tls)
         esp_mbedtls_cleanup(tls);
         if (tls->is_tls) {
             mbedtls_net_free(&tls->server_fd);
+            tls->sockfd = tls->server_fd.fd;
         }
     }
 }
@@ -259,6 +260,11 @@ static esp_err_t set_ca_cert(esp_tls_t *tls, const unsigned char *cacert, size_t
         ESP_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x", -ret);
         ESP_INT_EVENT_TRACKER_CAPTURE(tls->error_handle, ERR_TYPE_MBEDTLS, -ret);
         return ESP_ERR_MBEDTLS_X509_CRT_PARSE_FAILED;
+    }
+    if (ret > 0) {
+        /* This will happen if the CA chain contains one or more invalid certs, going ahead as the hadshake
+         * may still succeed if the other certificates in the CA chain are enough for the authentication */
+        ESP_LOGW(TAG, "mbedtls_x509_crt_parse was partly successful. No. of failed certificates: %d", ret);
     }
     mbedtls_ssl_conf_authmode(&tls->conf, MBEDTLS_SSL_VERIFY_REQUIRED);
     mbedtls_ssl_conf_ca_chain(&tls->conf, tls->cacert_ptr, NULL);
@@ -416,7 +422,7 @@ esp_err_t set_client_config(const char *hostname, size_t hostlen, esp_tls_cfg_t 
 
     if (cfg->alpn_protos) {
 #ifdef CONFIG_MBEDTLS_SSL_ALPN
-        if ((ret = mbedtls_ssl_conf_alpn_protocols(&tls->conf, cfg->alpn_protos) != 0)) {
+        if ((ret = mbedtls_ssl_conf_alpn_protocols(&tls->conf, cfg->alpn_protos)) != 0) {
             ESP_LOGE(TAG, "mbedtls_ssl_conf_alpn_protocols returned -0x%x", -ret);
             ESP_INT_EVENT_TRACKER_CAPTURE(tls->error_handle, ERR_TYPE_MBEDTLS, -ret);
             return ESP_ERR_MBEDTLS_SSL_CONF_ALPN_PROTOCOLS_FAILED;
@@ -557,6 +563,10 @@ esp_err_t esp_mbedtls_init_global_ca_store(void)
 
 esp_err_t esp_mbedtls_set_global_ca_store(const unsigned char *cacert_pem_buf, const unsigned int cacert_pem_bytes)
 {
+#ifdef CONFIG_MBEDTLS_DYNAMIC_FREE_CA_CERT
+    ESP_LOGE(TAG, "Please disable dynamic freeing of ca cert in mbedtls (CONFIG_MBEDTLS_DYNAMIC_FREE_CA_CERT)\n in order to use the global ca_store");
+    return ESP_FAIL;
+#endif
     if (cacert_pem_buf == NULL) {
         ESP_LOGE(TAG, "cacert_pem_buf is null");
         return ESP_ERR_INVALID_ARG;
@@ -572,6 +582,7 @@ esp_err_t esp_mbedtls_set_global_ca_store(const unsigned char *cacert_pem_buf, c
     if (ret < 0) {
         ESP_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x", -ret);
         mbedtls_x509_crt_free(global_cacert);
+        free(global_cacert);
         global_cacert = NULL;
         return ESP_FAIL;
     } else if (ret > 0) {
@@ -590,6 +601,7 @@ void esp_mbedtls_free_global_ca_store(void)
 {
     if (global_cacert) {
         mbedtls_x509_crt_free(global_cacert);
+        free(global_cacert);
         global_cacert = NULL;
     }
 }

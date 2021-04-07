@@ -19,6 +19,7 @@
 #include "nvs_partition_manager.hpp"
 #include "esp_partition.h"
 #include "sdkconfig.h"
+#include <functional>
 #include "nvs_handle_simple.hpp"
 #ifdef CONFIG_NVS_ENCRYPTION
 #include "nvs_encr.hpp"
@@ -120,8 +121,16 @@ extern "C" esp_err_t nvs_flash_secure_init_custom(const char *partName, uint32_t
 
 static esp_err_t close_handles_and_deinit(const char* part_name)
 {
-    // Delete all corresponding open handles
-    s_nvs_handles.clearAndFreeNodes();
+    auto belongs_to_part = [=](NVSHandleEntry& e) -> bool {
+        return strncmp(e.nvs_handle->get_partition_name(), part_name, NVS_PART_NAME_MAX_SIZE) == 0;
+    };
+
+    auto it = find_if(begin(s_nvs_handles), end(s_nvs_handles), belongs_to_part);
+
+    while (it != end(s_nvs_handles)) {
+        s_nvs_handles.erase(it);
+        it = find_if(begin(s_nvs_handles), end(s_nvs_handles), belongs_to_part);
+    }
 
     // Deinit partition
     return NVSPartitionManager::get_instance()->deinit_partition(part_name);
@@ -134,6 +143,10 @@ extern "C" esp_err_t nvs_flash_init_partition_ptr(const esp_partition_t *partiti
 
     if (!partition) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    if (partition->flash_chip != esp_flash_default_chip) {
+        return ESP_ERR_NOT_SUPPORTED;
     }
 
     return nvs_flash_init_custom(partition->label,
@@ -173,6 +186,10 @@ extern "C" esp_err_t nvs_flash_secure_init_partition(const char *part_name, nvs_
         return ESP_ERR_NOT_FOUND;
     }
 
+    if (partition->flash_chip != esp_flash_default_chip) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+
     return nvs_flash_secure_init_custom(part_name, partition->address / SPI_FLASH_SEC_SIZE,
             partition->size / SPI_FLASH_SEC_SIZE, cfg);
 }
@@ -204,6 +221,10 @@ extern "C" esp_err_t nvs_flash_erase_partition(const char *part_name)
         return ESP_ERR_NOT_FOUND;
     }
 
+    if (partition->flash_chip != esp_flash_default_chip) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+
     return esp_partition_erase_range(partition, 0, partition->size);
 }
 
@@ -214,6 +235,10 @@ extern "C" esp_err_t nvs_flash_erase_partition_ptr(const esp_partition_t *partit
 
     if (!partition) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    if (partition->flash_chip != esp_flash_default_chip) {
+        return ESP_ERR_NOT_SUPPORTED;
     }
 
     // if the partition is initialized, uninitialize it first
@@ -561,6 +586,10 @@ extern "C" esp_err_t nvs_get_used_entry_count(nvs_handle_t c_handle, size_t* use
 
 extern "C" esp_err_t nvs_flash_generate_keys(const esp_partition_t* partition, nvs_sec_cfg_t* cfg)
 {
+    if (partition->flash_chip != esp_flash_default_chip) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+
     auto err = esp_partition_erase_range(partition, 0, partition->size);
     if(err != ESP_OK) {
         return err;
@@ -609,6 +638,10 @@ extern "C" esp_err_t nvs_flash_generate_keys(const esp_partition_t* partition, n
 
 extern "C" esp_err_t nvs_flash_read_security_cfg(const esp_partition_t* partition, nvs_sec_cfg_t* cfg)
 {
+    if (partition->flash_chip != esp_flash_default_chip) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+
     uint8_t eky_raw[NVS_KEY_SIZE], tky_raw[NVS_KEY_SIZE];
     uint32_t crc_raw, crc_read, crc_calc;
 
