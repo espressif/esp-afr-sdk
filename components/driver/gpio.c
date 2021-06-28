@@ -76,9 +76,9 @@ esp_err_t gpio_pullup_en(gpio_num_t gpio_num)
     GPIO_CHECK(GPIO_IS_VALID_GPIO(gpio_num), "GPIO number error", ESP_ERR_INVALID_ARG);
 
     if (!rtc_gpio_is_valid_gpio(gpio_num) || GPIO_SUPPORTS_RTC_INDEPENDENT) {
-        portENTER_CRITICAL(&gpio_context.gpio_spinlock);
+        portENTER_CRITICAL_SAFE(&gpio_context.gpio_spinlock);
         gpio_hal_pullup_en(gpio_context.gpio_hal, gpio_num);
-        portEXIT_CRITICAL(&gpio_context.gpio_spinlock);
+        portEXIT_CRITICAL_SAFE(&gpio_context.gpio_spinlock);
     } else {
         rtc_gpio_pullup_en(gpio_num);
     }
@@ -91,9 +91,9 @@ esp_err_t gpio_pullup_dis(gpio_num_t gpio_num)
     GPIO_CHECK(GPIO_IS_VALID_GPIO(gpio_num), "GPIO number error", ESP_ERR_INVALID_ARG);
 
     if (!rtc_gpio_is_valid_gpio(gpio_num) || GPIO_SUPPORTS_RTC_INDEPENDENT) {
-        portENTER_CRITICAL(&gpio_context.gpio_spinlock);
+        portENTER_CRITICAL_SAFE(&gpio_context.gpio_spinlock);
         gpio_hal_pullup_dis(gpio_context.gpio_hal, gpio_num);
-        portEXIT_CRITICAL(&gpio_context.gpio_spinlock);
+        portEXIT_CRITICAL_SAFE(&gpio_context.gpio_spinlock);
     } else {
         rtc_gpio_pullup_dis(gpio_num);
     }
@@ -106,9 +106,9 @@ esp_err_t gpio_pulldown_en(gpio_num_t gpio_num)
     GPIO_CHECK(GPIO_IS_VALID_GPIO(gpio_num), "GPIO number error", ESP_ERR_INVALID_ARG);
 
     if (!rtc_gpio_is_valid_gpio(gpio_num) || GPIO_SUPPORTS_RTC_INDEPENDENT) {
-        portENTER_CRITICAL(&gpio_context.gpio_spinlock);
+        portENTER_CRITICAL_SAFE(&gpio_context.gpio_spinlock);
         gpio_hal_pulldown_en(gpio_context.gpio_hal, gpio_num);
-        portEXIT_CRITICAL(&gpio_context.gpio_spinlock);
+        portEXIT_CRITICAL_SAFE(&gpio_context.gpio_spinlock);
     } else {
         rtc_gpio_pulldown_en(gpio_num);
     }
@@ -121,9 +121,9 @@ esp_err_t gpio_pulldown_dis(gpio_num_t gpio_num)
     GPIO_CHECK(GPIO_IS_VALID_GPIO(gpio_num), "GPIO number error", ESP_ERR_INVALID_ARG);
 
     if (!rtc_gpio_is_valid_gpio(gpio_num) || GPIO_SUPPORTS_RTC_INDEPENDENT) {
-        portENTER_CRITICAL(&gpio_context.gpio_spinlock);
+        portENTER_CRITICAL_SAFE(&gpio_context.gpio_spinlock);
         gpio_hal_pulldown_dis(gpio_context.gpio_hal, gpio_num);
-        portEXIT_CRITICAL(&gpio_context.gpio_spinlock);
+        portEXIT_CRITICAL_SAFE(&gpio_context.gpio_spinlock);
     } else {
         rtc_gpio_pulldown_dis(gpio_num);
     }

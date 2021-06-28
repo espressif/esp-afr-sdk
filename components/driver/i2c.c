@@ -43,6 +43,8 @@ static const char *I2C_TAG = "i2c";
 #define I2C_EXIT_CRITICAL_ISR(mux)     portEXIT_CRITICAL_ISR(mux)
 #define I2C_ENTER_CRITICAL(mux)        portENTER_CRITICAL(mux)
 #define I2C_EXIT_CRITICAL(mux)         portEXIT_CRITICAL(mux)
+#define I2C_ENTER_CRITICAL_SAFE(mux)   portENTER_CRITICAL_SAFE(mux)
+#define I2C_EXIT_CRITICAL_SAFE(mux)    portEXIT_CRITICAL_SAFE(mux)
 
 #define I2C_DRIVER_ERR_STR             "i2c driver install error"
 #define I2C_DRIVER_MALLOC_ERR_STR      "i2c driver malloc error"
@@ -176,22 +178,22 @@ static esp_err_t IRAM_ATTR i2c_hw_fsm_reset(i2c_port_t i2c_num);
 
 static void i2c_hw_disable(i2c_port_t i2c_num)
 {
-    I2C_ENTER_CRITICAL(&(i2c_context[i2c_num].spinlock));
+    I2C_ENTER_CRITICAL_SAFE(&(i2c_context[i2c_num].spinlock));
     if (i2c_context[i2c_num].hw_enabled != false) {
         periph_module_disable(i2c_periph_signal[i2c_num].module);
         i2c_context[i2c_num].hw_enabled = false;
     }
-    I2C_EXIT_CRITICAL(&(i2c_context[i2c_num].spinlock));
+    I2C_EXIT_CRITICAL_SAFE(&(i2c_context[i2c_num].spinlock));
 }
 
 static void i2c_hw_enable(i2c_port_t i2c_num)
 {
-    I2C_ENTER_CRITICAL(&(i2c_context[i2c_num].spinlock));
+    I2C_ENTER_CRITICAL_SAFE(&(i2c_context[i2c_num].spinlock));
     if (i2c_context[i2c_num].hw_enabled != true) {
         periph_module_enable(i2c_periph_signal[i2c_num].module);
         i2c_context[i2c_num].hw_enabled = true;
     }
-    I2C_EXIT_CRITICAL(&(i2c_context[i2c_num].spinlock));
+    I2C_EXIT_CRITICAL_SAFE(&(i2c_context[i2c_num].spinlock));
 }
 
 /*
@@ -1022,17 +1024,22 @@ static void IRAM_ATTR i2c_master_cmd_begin_static(i2c_port_t i2c_num)
         } else {
             p_i2c->cmd_link.head = p_i2c->cmd_link.head->next;
         }
-    } else if ((p_i2c->status == I2C_STATUS_ACK_ERROR)
-               || (p_i2c->status == I2C_STATUS_TIMEOUT)) {
+    } else if (p_i2c->status == I2C_STATUS_TIMEOUT) {
         i2c_hw_fsm_reset(i2c_num);
-            evt.type = I2C_CMD_EVT_TIMEOUT;
-        } else if (p_i2c->status == I2C_STATUS_ACK_ERROR) {
-            clear_bus_cnt++;
-            if(clear_bus_cnt >= I2C_ACKERR_CNT_MAX) {
-                i2c_master_clear_bus(i2c_num);
-                clear_bus_cnt = 0;
-            }
-            evt.type = I2C_CMD_EVT_ACK_ERR;
+        clear_bus_cnt = 0;
+        evt.type = I2C_CMD_EVT_TIMEOUT;
+        xQueueOverwriteFromISR(p_i2c->cmd_evt_queue, &evt, &HPTaskAwoken);
+        if (p_i2c->i2c_isr_cb) {
+            p_i2c->i2c_isr_cb(I2C_TRANS_STATUS_ERR, p_i2c->user_ctx);
+        }
+        return;
+    } else if (p_i2c->status == I2C_STATUS_ACK_ERROR) {
+        clear_bus_cnt++;
+        if (clear_bus_cnt >= I2C_ACKERR_CNT_MAX) {
+            i2c_master_clear_bus(i2c_num);
+            clear_bus_cnt = 0;
+        }
+        evt.type = I2C_CMD_EVT_ACK_ERR;
         xQueueOverwriteFromISR(p_i2c->cmd_evt_queue, &evt, &HPTaskAwoken);
         if (p_i2c->i2c_isr_cb) {
             p_i2c->i2c_isr_cb(I2C_TRANS_STATUS_ERR, p_i2c->user_ctx);

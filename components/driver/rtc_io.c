@@ -131,9 +131,9 @@ esp_err_t rtc_gpio_pullup_en(gpio_num_t gpio_num)
 esp_err_t rtc_gpio_pullup_dis(gpio_num_t gpio_num)
 {
     RTCIO_CHECK(rtc_gpio_is_valid_gpio(gpio_num), "RTCIO number error", ESP_ERR_INVALID_ARG);
-    RTCIO_ENTER_CRITICAL();
+    RTCIO_ENTER_CRITICAL_SAFE();
     rtcio_hal_pullup_disable(rtc_io_number_get(gpio_num));
-    RTCIO_EXIT_CRITICAL();
+    RTCIO_EXIT_CRITICAL_SAFE();
 
     return ESP_OK;
 }
@@ -141,9 +141,9 @@ esp_err_t rtc_gpio_pullup_dis(gpio_num_t gpio_num)
 esp_err_t rtc_gpio_pulldown_en(gpio_num_t gpio_num)
 {
     RTCIO_CHECK(rtc_gpio_is_valid_gpio(gpio_num), "RTCIO number error", ESP_ERR_INVALID_ARG);
-    RTCIO_ENTER_CRITICAL();
+    RTCIO_ENTER_CRITICAL_SAFE();
     rtcio_hal_pulldown_enable(rtc_io_number_get(gpio_num));
-    RTCIO_EXIT_CRITICAL();
+    RTCIO_EXIT_CRITICAL_SAFE();
 
     return ESP_OK;
 }
