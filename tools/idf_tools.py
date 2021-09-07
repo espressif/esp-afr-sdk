@@ -117,6 +117,8 @@ PLATFORM_FROM_NAME = {
     'osx': PLATFORM_MACOS,
     'darwin': PLATFORM_MACOS,
     'Darwin-x86_64': PLATFORM_MACOS,
+    # pretend it is x86_64 until Darwin-arm64 tool builds are available:
+    'Darwin-arm64': PLATFORM_MACOS,
     # Linux
     PLATFORM_LINUX64: PLATFORM_LINUX64,
     'linux64': PLATFORM_LINUX64,
@@ -474,8 +476,8 @@ class IDFTool(object):
             # tool is not on the path
             raise ToolNotFound('Tool {} not found'.format(self.name))
         except subprocess.CalledProcessError as e:
-            raise ToolExecError('Command {} has returned non-zero exit code ({})\n'.format(
-                ' '.join(self._current_options.version_cmd), e.returncode))
+            raise ToolExecError('returned non-zero exit code ({}) with error message:\n{}'.format(
+                e.returncode, e.stderr.decode('utf-8',errors='ignore')))  # type: ignore
 
         in_str = version_cmd_result.decode("utf-8")
         match = re.search(self._current_options.version_regex, in_str)
@@ -526,8 +528,9 @@ class IDFTool(object):
         except ToolNotFound:
             # not in PATH
             pass
-        except ToolExecError:
-            warn('tool {} found in path, but failed to run'.format(self.name))
+        except ToolExecError as e:
+            warn('tool {} found in path, but {}'.format(
+                self.name, e))
         else:
             self.version_in_path = ver_str
 
@@ -545,9 +548,9 @@ class IDFTool(object):
             except ToolNotFound:
                 warn('directory for tool {} version {} is present, but tool was not found'.format(
                     self.name, version))
-            except ToolExecError:
-                warn('tool {} version {} is installed, but the tool failed to run'.format(
-                    self.name, version))
+            except ToolExecError as e:
+                warn('tool {} version {} is installed, but {}'.format(
+                    self.name, version, e))
             else:
                 if ver_str != version:
                     warn('tool {} version {} is installed, but has reported version {}'.format(
@@ -856,12 +859,15 @@ def get_python_env_path():
         with open(version_file_path, "r") as version_file:
             idf_version_str = version_file.read()
     else:
+        idf_version_str = ''
         try:
             idf_version_str = subprocess.check_output(['git', 'describe'],
                                                       cwd=global_idf_path, env=os.environ).decode()
+        except OSError:
+            # OSError should cover FileNotFoundError and WindowsError
+            warn('Git was not found')
         except subprocess.CalledProcessError as e:
-            warn('Git describe was unsuccessul: {}'.format(e))
-            idf_version_str = ''
+            warn('Git describe was unsuccessul: {}'.format(e.output))
     match = re.match(r'^v([0-9]+\.[0-9]+).*', idf_version_str)
     if match:
         idf_version = match.group(1)
@@ -1066,6 +1072,11 @@ def action_export(args):
         raise SystemExit(1)
 
 
+def apply_url_mirrors(args, tool_download_obj):
+    apply_mirror_prefix_map(args, tool_download_obj)
+    apply_github_assets_option(tool_download_obj)
+
+
 def apply_mirror_prefix_map(args, tool_download_obj):
     """Rewrite URL for given tool_obj, given tool_version, and current platform,
        if --mirror-prefix-map flag or IDF_MIRROR_PREFIX_MAP environment variable is given.
@@ -1091,6 +1102,32 @@ def apply_mirror_prefix_map(args, tool_download_obj):
                 info('Changed download URL: {} => {}'.format(old_url, new_url))
                 tool_download_obj.url = new_url
                 break
+
+
+def apply_github_assets_option(tool_download_obj):
+    """ Rewrite URL for given tool_obj if the download URL is an https://github.com/ URL and the variable
+    IDF_GITHUB_ASSETS is set. The github.com part of the URL will be replaced.
+    """
+    try:
+        github_assets = os.environ["IDF_GITHUB_ASSETS"].strip()
+    except KeyError:
+        return  # no IDF_GITHUB_ASSETS
+    if not github_assets:  # variable exists but is empty
+        return
+
+    # check no URL qualifier in the mirror URL
+    if '://' in github_assets:
+        fatal("IDF_GITHUB_ASSETS shouldn't include any URL qualifier, https:// is assumed")
+        raise SystemExit(1)
+
+    # Strip any trailing / from the mirror URL
+    github_assets = github_assets.rstrip('/')
+
+    old_url = tool_download_obj.url
+    new_url = re.sub(r'^https://github.com/', 'https://{}/'.format(github_assets), old_url)
+    if new_url != old_url:
+        info('Using GitHub assets mirror for URL: {} => {}'.format(old_url, new_url))
+        tool_download_obj.url = new_url
 
 
 def action_download(args):
@@ -1135,7 +1172,7 @@ def action_download(args):
         tool_spec = '{}@{}'.format(tool_name, tool_version)
 
         info('Downloading {}'.format(tool_spec))
-        apply_mirror_prefix_map(args, tool_obj.versions[tool_version].get_download_for_platform(platform))
+        apply_url_mirrors(args, tool_obj.versions[tool_version].get_download_for_platform(platform))
 
         tool_obj.download(tool_version)
 
@@ -1176,21 +1213,37 @@ def action_install(args):
             continue
 
         info('Installing {}'.format(tool_spec))
-        apply_mirror_prefix_map(args, tool_obj.versions[tool_version].get_download_for_platform(PYTHON_PLATFORM))
+        apply_url_mirrors(args, tool_obj.versions[tool_version].get_download_for_platform(PYTHON_PLATFORM))
 
         tool_obj.download(tool_version)
         tool_obj.install(tool_version)
 
 
-def action_install_python_env(args):
+def action_install_python_env(args):  # type: ignore
+    reinstall = args.reinstall
     idf_python_env_path, _, virtualenv_python = get_python_env_path()
 
     is_virtualenv = hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)
-    if is_virtualenv and (not os.path.exists(idf_python_env_path) or args.reinstall):
+    if is_virtualenv and (not os.path.exists(idf_python_env_path) or reinstall):
         fatal('This script was called from a virtual environment, can not create a virtual environment again')
         raise SystemExit(1)
 
-    if args.reinstall and os.path.exists(idf_python_env_path):
+    if os.path.exists(virtualenv_python):
+        try:
+            subprocess.check_call([virtualenv_python, '--version'], stdout=sys.stdout, stderr=sys.stderr)
+        except (OSError, subprocess.CalledProcessError):
+            # At this point we can reinstall the virtual environment if it is non-functional. This can happen at least
+            # when the Python interpreter was removed which was used to create the virtual environment.
+            reinstall = True
+
+        try:
+            subprocess.check_call([virtualenv_python, '-m', 'pip', '--version'], stdout=sys.stdout, stderr=sys.stderr)
+        except subprocess.CalledProcessError:
+            warn('PIP is not available in the virtual environment.')
+            # Reinstallation of the virtual environment could help if PIP was installed for the main Python
+            reinstall = True
+
+    if reinstall and os.path.exists(idf_python_env_path):
         warn('Removing the existing Python environment in {}'.format(idf_python_env_path))
         shutil.rmtree(idf_python_env_path)
 

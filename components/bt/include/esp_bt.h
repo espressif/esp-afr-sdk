@@ -351,12 +351,6 @@ esp_err_t esp_bt_controller_disable(void);
  */
 esp_bt_controller_status_t esp_bt_controller_get_status(void);
 
-/**
- * @brief  Get BT MAC address.
- * @return Array pointer of length 6 storing MAC address value.
- */
-uint8_t* esp_bt_get_mac(void);
-
 /** @brief esp_vhci_host_callback
  *  used for vhci call host function to notify what host need to do
  */
@@ -488,6 +482,7 @@ esp_err_t esp_bt_sleep_disable(void);
  * Note that scan duplicate list will be automatically cleared when the maximum amount of device in the filter is reached
  * the amount of device in the filter can be configured in menuconfig.
  *
+ * @note This function name is incorrectly spelled, it will be fixed in release 5.x version.
  *
  * @return
  *                  - ESP_OK : success

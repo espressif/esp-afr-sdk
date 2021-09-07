@@ -24,6 +24,7 @@
   artifacts:
     when: always
     paths:
+      - "**/*.log"
       - $LOG_PATH
     expire_in: 1 week
     reports:
@@ -34,6 +35,7 @@
     LOG_PATH: "$CI_PROJECT_DIR/TEST_LOGS"
     ENV_FILE: "$CI_PROJECT_DIR/ci-test-runner-configs/$CI_RUNNER_DESCRIPTION/EnvConfig.yml"
     SUBMODULES_TO_FETCH: "components/esptool_py/esptool"
+    PYTHON_VER: 3
   script:
     - *define_config_file_name
     # first test if config file exists, if not exist, exit 0
@@ -41,9 +43,11 @@
     # clone test env configs
     - ./tools/ci/retry_failed.sh git clone $TEST_ENV_CONFIG_REPO
     - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
-    - cd tools/ci/python_packages/tiny_test_fw/bin
+    # git clone the known failure cases repo, run test
+    - ./tools/ci/retry_failed.sh git clone $KNOWN_FAILURE_CASES_REPO known_failure_cases
     # run test
-    - python Runner.py $TEST_CASE_PATH -c $CONFIG_FILE -e $ENV_FILE
+    - cd tools/ci/python_packages/tiny_test_fw/bin
+    - python Runner.py $TEST_CASE_PATH -c $CONFIG_FILE -e $ENV_FILE --known_failure_cases_file $CI_PROJECT_DIR/known_failure_cases/known_failure_cases.txt
 
 .example_debug_template:
   stage: target_test
@@ -63,6 +67,7 @@
   artifacts:
     when: always
     paths:
+      - "**/*.log"
       - $LOG_PATH
     expire_in: 1 week
     reports:
@@ -79,9 +84,11 @@
     # clone test env configs
     - ./tools/ci/retry_failed.sh git clone $TEST_ENV_CONFIG_REPO
     - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
-    - cd tools/ci/python_packages/tiny_test_fw/bin
+    # git clone the known failure cases repo, run test
+    - ./tools/ci/retry_failed.sh git clone $KNOWN_FAILURE_CASES_REPO known_failure_cases
     # run test
-    - python Runner.py $TEST_CASE_PATH -c $CONFIG_FILE -e $ENV_FILE
+    - cd tools/ci/python_packages/tiny_test_fw/bin
+    - python Runner.py $TEST_CASE_PATH -c $CONFIG_FILE -e $ENV_FILE --known_failure_cases_file $CI_PROJECT_DIR/known_failure_cases/known_failure_cases.txt
 
 .test_app_template:
   extends: .example_test_template
@@ -150,12 +157,13 @@
     reports:
         junit: $LOG_PATH/*/XUNIT_RESULT.xml
     paths:
+      - "**/*.log"
       - $LOG_PATH
     expire_in: 1 week
   variables:
     SUBMODULES_TO_FETCH: "components/esptool_py/esptool"
     LOCAL_ENV_CONFIG_PATH: "$CI_PROJECT_DIR/ci-test-runner-configs/$CI_RUNNER_DESCRIPTION/ESP32_IDF"
-    LOG_PATH: "${CI_PROJECT_DIR}/${CI_COMMIT_SHA}"
+    LOG_PATH: "${CI_PROJECT_DIR}/TEST_LOGS"
     TEST_CASE_FILE_PATH: "$CI_PROJECT_DIR/auto_test_script/TestCaseFiles"
     MODULE_UPDATE_FILE: "$CI_PROJECT_DIR/components/idf_test/ModuleDefinition.yml"
     CONFIG_FILE_PATH: "${CI_PROJECT_DIR}/components/idf_test/integration_test/CIConfigs"
@@ -212,11 +220,6 @@ test_weekend_network:
 example_test_001A:
   extends: .example_test_template
   parallel: 4
-  artifacts:
-      when: always
-      paths:
-        - $CI_PROJECT_DIR/examples/*/*/*.log
-      expire_in: 1 week
   tags:
     - ESP32
     - Example_WIFI
@@ -303,11 +306,6 @@ example_test_009:
   tags:
     - ESP32
     - test_jtag_arm
-  artifacts:
-      when: always
-      paths:
-        - $CI_PROJECT_DIR/examples/*/*/*.log
-      expire_in: 1 week
   variables:
     SETUP_TOOLS: "1"
 
@@ -322,12 +320,6 @@ example_test_011:
   tags:
     - ESP32
     - UT_T2_RS485
-  artifacts:
-      when: always
-      expire_in: 1 week
-      paths:
-        - $CI_PROJECT_DIR/examples/protocols/modbus/serial/*.log
-        - $LOG_PATH
   variables:
     SETUP_TOOLS: "1"
 
@@ -354,23 +346,20 @@ example_test_015:
   tags:
     - ESP32
     - Example_PPP
-  artifacts:
-      when: always
-      expire_in: 1 week
-      paths:
-        - $CI_PROJECT_DIR/examples/*/*/*.log
-        - $LOG_PATH
+
+test_app_test_esp32_generic:
+  extends: .test_app_template
+  tags:
+    - ESP32
+    - Example_GENERIC
+  variables:
+    SETUP_TOOLS: "1"
 
 test_app_test_001:
   extends: .test_app_template
   tags:
     - ESP32
     - test_jtag_arm
-  artifacts:
-      when: always
-      paths:
-        - $CI_PROJECT_DIR/tools/test_apps/system/gdb_loadable_elf/*.log
-      expire_in: 1 week
   variables:
     SETUP_TOOLS: "1"
 

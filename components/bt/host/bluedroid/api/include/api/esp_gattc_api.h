@@ -258,7 +258,7 @@ typedef union {
 /**
  * @brief GATT Client callback function type
  * @param event : Event type
- * @param gatts_if : GATT client access interface, normally
+ * @param gattc_if : GATT client access interface, normally
  *                   different gattc_if correspond to different profile
  * @param param : Point to callback parameter, currently is union type
  */
@@ -312,7 +312,7 @@ esp_err_t esp_ble_gattc_app_unregister(esp_gatt_if_t gattc_if);
  * @param[in]       gattc_if: Gatt client access interface.
  * @param[in]       remote_bda: remote device bluetooth device address.
  * @param[in]       remote_addr_type: remote device bluetooth device the address type.
- * @param[in]       is_direct: direct connection or background auto connection
+ * @param[in]       is_direct: direct connection or background auto connection(by now, background auto connection is not supported).
  *
  * @return
  *                  - ESP_OK: success
@@ -376,7 +376,7 @@ esp_err_t esp_ble_gattc_search_service(esp_gatt_if_t gattc_if, uint16_t conn_id,
 /**
  * @brief           Find all the service with the given service uuid in the gattc cache, if the svc_uuid is NULL, find all the service.
  *                  Note: It just get service from local cache, won't get from remote devices. If want to get it from remote device, need
- *                  to used the esp_ble_gattc_search_service.
+ *                  to used the esp_ble_gattc_cache_refresh, then call esp_ble_gattc_get_service again.
  *
  * @param[in]       gattc_if: Gatt client access interface.
  * @param[in]       conn_id: connection ID which identify the server.

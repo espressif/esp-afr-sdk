@@ -40,6 +40,7 @@ If they using different port then need to implement their DUTPort class as well.
 from __future__ import print_function
 import time
 import re
+import sys
 import threading
 import copy
 import functools
@@ -78,11 +79,15 @@ def _expect_lock(func):
 def _decode_data(data):
     """ for python3, if the data is bytes, then decode it to string """
     if isinstance(data, bytes):
-        # convert bytes to string
+        # convert bytes to string. This is a bit of a hack, we know that we want to log this
+        # later so encode to the stdout encoding with backslash escapes for anything non-encodable
+        encoding = sys.stdout.encoding
+        if encoding is None:
+            encoding = 'ascii'
         try:
-            data = data.decode("utf-8", "ignore")
-        except UnicodeDecodeError:
-            data = data.decode("iso8859-1", )
+            return data.decode(encoding, "backslashreplace")
+        except (UnicodeDecodeError, TypeError):  # Python <3.5 doesn't support backslashreplace
+            return data.decode(encoding, "replace")
     return data
 
 
@@ -537,13 +542,11 @@ class BaseDUT(object):
         :return: match groups if match succeed otherwise None
         """
         ret = None
-        if isinstance(pattern.pattern, type(u'')):
-            pattern = re.compile(BaseDUT.u_to_bytearray(pattern.pattern))
-        if isinstance(data, type(u'')):
-            data = BaseDUT.u_to_bytearray(data)
+        if isinstance(pattern.pattern, bytes):
+            pattern = re.compile(_decode_data(pattern.pattern))
         match = pattern.search(data)
         if match:
-            ret = tuple(None if x is None else x.decode() for x in match.groups())
+            ret = tuple(x for x in match.groups())
             index = match.end()
         else:
             index = -1

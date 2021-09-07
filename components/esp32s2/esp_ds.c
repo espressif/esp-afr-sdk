@@ -129,6 +129,7 @@ esp_err_t esp_ds_start_sign(const void *message,
 
     if (result == ETS_DS_INVALID_KEY) {
         ds_disable_release();
+        free(context);
         return ESP_ERR_HW_CRYPTO_DS_INVALID_KEY;
     }
 
@@ -161,8 +162,9 @@ esp_err_t esp_ds_finish_sign(void *signature, esp_ds_context_t *esp_ds_ctx)
 
     free(esp_ds_ctx);
 
-    // should not fail if called with correct purpose
-    assert(ets_hmac_invalidate_downstream(ETS_EFUSE_KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE) == ETS_OK);
+    int res = ets_hmac_invalidate_downstream(ETS_EFUSE_KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE);
+    assert(res == ETS_OK); // should not fail if called with correct purpose
+    (void)res;
 
     ds_disable_release();
 

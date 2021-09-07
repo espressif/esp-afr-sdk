@@ -111,7 +111,7 @@ idf_component_register(SRCS "${srcs}" "${tls_src}"
                     PRIV_INCLUDE_DIRS src
                     PRIV_REQUIRES mbedtls esp_timer)
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-strict-aliasing)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-strict-aliasing -Wno-write-strings)
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
     __ets__
     ESP_SUPPLICANT
@@ -135,6 +135,9 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
 
 if(CONFIG_ESP32_WIFI_ENABLE_WPA3_SAE)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE CONFIG_WPA3_SAE)
+endif()
+if(CONFIG_WPA_WPS_STRICT)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE CONFIG_WPS_STRICT)
 endif()
 
 set_property(TARGET ${COMPONENT_LIB} APPEND PROPERTY LINK_INTERFACE_MULTIPLICITY 3)

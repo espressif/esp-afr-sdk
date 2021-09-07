@@ -216,8 +216,12 @@ static void IRAM_ATTR timer_isr_default(void *arg)
             is_awoken = timer_obj->timer_isr_fun.fn(timer_obj->timer_isr_fun.args);
             //Clear intrrupt status
             timer_hal_clear_intr_status(&(timer_obj->hal));
-            //After the alarm has been triggered, we need enable it again, so it is triggered the next time.
-            timer_hal_set_alarm_enable(&(timer_obj->hal), TIMER_ALARM_EN);
+            //If the timer is set to auto reload, we need enable it again, so it is triggered the next time.
+            if (timer_hal_get_auto_reload(&timer_obj->hal)) {
+                timer_hal_set_alarm_enable(&(timer_obj->hal), TIMER_ALARM_EN);
+            } else {
+                timer_hal_set_alarm_enable(&(timer_obj->hal), TIMER_ALARM_DIS);
+            }
         }
     }
     TIMER_EXIT_CRITICAL(&timer_spinlock[timer_obj->timer_isr_fun.isr_timer_group]);
@@ -497,14 +501,14 @@ bool IRAM_ATTR timer_group_get_auto_reload_in_isr(timer_group_t group_num, timer
     return timer_hal_get_auto_reload(&(p_timer_obj[group_num][timer_num]->hal));
 }
 
-esp_err_t timer_spinlock_take(timer_group_t group_num)
+esp_err_t IRAM_ATTR timer_spinlock_take(timer_group_t group_num)
 {
     TIMER_CHECK(group_num < TIMER_GROUP_MAX, TIMER_GROUP_NUM_ERROR, ESP_ERR_INVALID_ARG);
     TIMER_ENTER_CRITICAL(&timer_spinlock[group_num]);
     return ESP_OK;
 }
 
-esp_err_t timer_spinlock_give(timer_group_t group_num)
+esp_err_t IRAM_ATTR timer_spinlock_give(timer_group_t group_num)
 {
     TIMER_CHECK(group_num < TIMER_GROUP_MAX, TIMER_GROUP_NUM_ERROR, ESP_ERR_INVALID_ARG);
     TIMER_EXIT_CRITICAL(&timer_spinlock[group_num]);

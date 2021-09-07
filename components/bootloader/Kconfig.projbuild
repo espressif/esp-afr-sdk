@@ -114,7 +114,8 @@ menu "Bootloader config"
     config BOOTLOADER_NUM_PIN_FACTORY_RESET
         int "Number of the GPIO input for factory reset"
         depends on BOOTLOADER_FACTORY_RESET
-        range 0 39
+        range 0 39 if IDF_TARGET_ESP32
+        range 0 44 if IDF_TARGET_ESP32S2
         default 4
         help
             The selected GPIO will be configured as an input with internal pull-up enabled.
@@ -641,6 +642,7 @@ menu "Security features"
         config SECURE_FLASH_ENCRYPTION_MODE_RELEASE
             bool "Release"
             select SECURE_ENABLE_SECURE_ROM_DL_MODE if SECURE_TARGET_HAS_SECURE_ROM_DL_MODE && !SECURE_DISABLE_ROM_DL_MODE # NOERROR
+            select PARTITION_TABLE_MD5 if !ESP32_COMPATIBLE_PRE_V3_1_BOOTLOADERS
 
     endchoice
 
@@ -702,9 +704,17 @@ menu "Security features"
                 efuse when Secure Boot is enabled. This prevents any more efuses from being read protected.
 
                 If this option is set, it will remain possible to write the EFUSE_RD_DIS efuse field after Secure
-                Boot is enabled. This may allow an attacker to read-protect the BLK2 efuse holding the public
-                key digest, causing an immediate denial of service and possibly allowing an additional fault
-                injection attack to bypass the signature protection.
+                Boot is enabled. This may allow an attacker to read-protect the BLK2 efuse (for ESP32) and
+                BLOCK4-BLOCK10 (i.e. BLOCK_KEY0-BLOCK_KEY5)(for other chips) holding the public key digest, causing an
+                immediate denial of service and possibly allowing an additional fault injection attack to
+                bypass the signature protection.
+
+                NOTE: Once a BLOCK is read-protected, the application will read all zeros from that block
+
+                NOTE: If "UART ROM download mode (Permanently disabled (recommended))" or
+                "UART ROM download mode (Permanently switch to Secure mode (recommended))" is set,
+                then it is __NOT__ possible to read/write efuses using espefuse.py utility.
+                However, efuse can be read/written from the application
 
         config SECURE_INSECURE_ALLOW_DL_MODE
             bool "Don't automatically restrict UART download mode"

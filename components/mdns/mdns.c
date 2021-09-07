@@ -73,6 +73,17 @@ esp_netif_t *_mdns_get_esp_netif(mdns_if_t tcpip_if)
     return NULL;
 }
 
+
+/*
+ * @brief Clean internal mdns interface's pointer
+ */
+static inline void _mdns_clean_netif_ptr(mdns_if_t tcpip_if) {
+    if (tcpip_if < MDNS_IF_MAX) {
+        s_esp_netifs[tcpip_if] = NULL;
+    }
+}
+
+
 /*
  * @brief  Convert esp-netif handle to mdns if
  */
@@ -1314,15 +1325,17 @@ static void _mdns_create_answer_from_parsed_packet(mdns_parsed_packet_t * parsed
                     return;
                 }
 #ifdef MDNS_REPEAT_QUERY_IN_RESPONSE
-                mdns_out_question_t * out_question = malloc(sizeof(mdns_out_question_t));
-                if (out_question == NULL) {
-                    HOOK_MALLOC_FAILED;
-                    _mdns_free_tx_packet(packet);
-                    return;
+                if (parsed_packet->src_port != MDNS_SERVICE_PORT) {
+                    mdns_out_question_t * out_question = malloc(sizeof(mdns_out_question_t));
+                    if (out_question == NULL) {
+                        HOOK_MALLOC_FAILED;
+                        _mdns_free_tx_packet(packet);
+                        return;
+                    }
+                    memcpy(out_question, q, sizeof(mdns_out_question_t));
+                    out_question->next = NULL;
+                    queueToEnd(mdns_out_question_t, packet->questions, out_question);
                 }
-                memcpy(out_question, q, sizeof(mdns_out_question_t));
-                out_question->next = NULL;
-                queueToEnd(mdns_out_question_t, packet->questions, out_question);
 #endif // MDNS_REPEAT_QUERY_IN_RESPONSE
             } else if (!_mdns_alloc_answer(&packet->answers, q->type, NULL, send_flush, false)) {
                 _mdns_free_tx_packet(packet);
@@ -3110,6 +3123,8 @@ void _mdns_enable_pcb(mdns_if_t tcpip_if, mdns_ip_protocol_t ip_protocol)
  */
 void _mdns_disable_pcb(mdns_if_t tcpip_if, mdns_ip_protocol_t ip_protocol)
 {
+    _mdns_clean_netif_ptr(tcpip_if);
+
     if (_mdns_server->interfaces[tcpip_if].pcbs[ip_protocol].pcb) {
         _mdns_clear_pcb_tx_queue_head(tcpip_if, ip_protocol);
         _mdns_pcb_deinit(tcpip_if, ip_protocol);
