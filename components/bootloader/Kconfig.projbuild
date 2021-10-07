@@ -428,6 +428,7 @@ menu "Security features"
     config FLASH_ENCRYPTION_ENABLED
         bool "Enable flash encryption on boot (READ DOCS FIRST)"
         default N
+        select PARTITION_TABLE_MD5 if !ESP32_COMPATIBLE_PRE_V3_1_BOOTLOADERS
         help
             If this option is set, flash contents will be encrypted by the bootloader on first boot.
 
@@ -548,5 +549,22 @@ menu "Security features"
             If this option is disabled and hardware Secure Boot is enabled, Secure Boot must be configured in
             Reflashable mode so that a new Secure Boot digest can be flashed at the same time as plaintext firmware.
             This combination is not secure and should not be used for a production system.
+
+    config SECURE_DISABLE_ROM_DL_MODE
+        bool "Permanently disable ROM Download Mode"
+        depends on ESP32_REV_MIN_3
+        default n
+        help
+            If set, during startup the app will burn an eFuse bit to permanently disable the UART ROM
+            Download Mode. This prevents any future use of esptool.py, espefuse.py and similar tools.
+
+            Once disabled, if the SoC is booted with strapping pins set for ROM Download Mode
+            then an error is printed instead.
+
+            It is recommended to enable this option in any production application where Flash
+            Encryption and/or Secure Boot is enabled and access to Download Mode is not required.
+
+            It is also possible to permanently disable Download Mode by calling
+            esp_efuse_disable_rom_download_mode() at runtime.
 
 endmenu  # Security features

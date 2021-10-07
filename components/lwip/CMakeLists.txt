@@ -6,6 +6,7 @@ set(COMPONENT_ADD_INCLUDEDIRS
     port/esp32/include
     port/esp32/include/arch
     include_compat
+    port/esp32/tcp_isn
     )
 
 set(COMPONENT_SRCS "apps/dhcpserver/dhcpserver.c"
@@ -123,6 +124,10 @@ if(CONFIG_PPP_SUPPORT)
                    "lwip/src/netif/ppp/polarssl/md5.c"
                    "lwip/src/netif/ppp/polarssl/sha1.c")
 endif()
+endif()
+
+if(CONFIG_LWIP_TCP_ISN_HOOK)
+    list(APPEND COMPONENT_SRCS "port/esp32/tcp_isn/tcp_isn.c")
 endif()
 
 set(COMPONENT_REQUIRES vfs)

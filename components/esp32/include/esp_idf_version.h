@@ -23,7 +23,7 @@ extern "C" {
 /** Minor version number (x.X.x) */
 #define ESP_IDF_VERSION_MINOR   3
 /** Patch version number (x.x.X) */
-#define ESP_IDF_VERSION_PATCH   2
+#define ESP_IDF_VERSION_PATCH   5
 
 /**
  * Macro to convert IDF version number into an integer
@@ -41,6 +41,8 @@ extern "C" {
                                              ESP_IDF_VERSION_MINOR, \
                                              ESP_IDF_VERSION_PATCH)
 
+#ifndef __ASSEMBLER__
+
 /**
  * Return full IDF version string, same as 'git describe' output.
  *
@@ -52,6 +54,8 @@ extern "C" {
  * @return constant string from IDF_VER
  */
 const char* esp_get_idf_version(void);
+
+#endif
 
 #ifdef __cplusplus
 }

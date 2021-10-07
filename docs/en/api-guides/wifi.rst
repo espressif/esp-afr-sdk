@@ -172,7 +172,7 @@ SYSTEM_EVENT_STA_DISCONNECTED
 ++++++++++++++++++++++++++++++++++++
 This event can be generated in the following scenarios:
 
-  - When esp_wifi_disconnect(), or esp_wifi_stop(), or esp_wifi_deinit(), or esp_wifi_restart() is called and the station is already connected to the AP.
+  - When :cpp:func:`esp_wifi_disconnect()`, or :cpp:func:`esp_wifi_stop()`, or :cpp:func:`esp_wifi_deinit()` is called and the station is already connected to the AP.
   - When esp_wifi_connect() is called, but the Wi-Fi driver fails to set up a connection with the AP due to certain reasons, e.g. the scan fails to find the target AP, authentication times out, etc. If there are more than one AP with the same SSID, the disconnected event is raised after the station fails to connect all of the found APs.
   - When the Wi-Fi connection is disrupted because of specific reasons, e.g., the station continuously loses N beacons, the AP kicks off the station, the AP's authentication mode is changed, etc. 
 
@@ -190,10 +190,6 @@ Another thing deserves our attention is that the default behavior of LwIP is to 
 - Sixty seconds later, when the application sends out data with the keep-alive socket, the socket returns an error and the application closes the socket and re-creates it when necessary.
 
 In above scenario, ideally, the application sockets and the network layer should not be affected, since the Wi-Fi connection only fails temporarily and recovers very quickly. The application can enable "Keep TCP connections when IP changed" via LwIP menuconfig. 
-
-SYSTEM_EVENT_STA_AUTHMODE_CHANGE
-++++++++++++++++++++++++++++++++++++
-This event arises when the AP to which the station is connected changes its authentication mode, e.g., from no auth to WPA. Upon receiving this event, the event task will do nothing. Generally, the application event callback does not need to handle this either.
 
 SYSTEM_EVENT_STA_GOT_IP
 ++++++++++++++++++++++++++++++++++++
@@ -238,7 +234,7 @@ SYSTEM_EVENT_AP_STADISCONNECTED
 This event can happen in the following scenarios:
 
   - The application calls esp_wifi_disconnect(), or esp_wifi_deauth_sta(), to manually disconnect the station.
-  - The Wi-Fi driver kicks off the station, e.g. because the AP has not received any packets in the past five minutes, etc.
+  - The Wi-Fi driver kicks off the station, e.g. because the AP has not received any packets in the past five minutes, etc. The time can be modified by :cpp:func:`esp_wifi_set_inactive_time`.
   - The station kicks off the AP.
 
 When this event happens, the event task will do nothing, but the application event callback needs to do something, e.g., close the socket which is related to this station, etc.
@@ -1019,6 +1015,10 @@ The table below shows the reason-code defined in ESP32. The first column is the 
 |                           |       |         | WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT.                         |
 |                           |       |         |                                                             |
 +---------------------------+-------+---------+-------------------------------------------------------------+
+| CONNECTION_FAIL           |  205  |reserved | Espressif-specific Wi-Fi reason-code: the                   |
+|                           |       |         | connection to the AP has failed.                            |
+|                           |       |         |                                                             |
++---------------------------+-------+---------+-------------------------------------------------------------+
 
 ESP32 Wi-Fi Station Connecting When Multiple APs Are Found
 ---------------------------------------------------------------
@@ -1148,6 +1148,8 @@ API esp_wifi_set_config() can be used to configure the station. The table below 
 |                  | threshold is open.                                           |
 +------------------+--------------------------------------------------------------+
 
+.. attention::
+    WEP/WPA security modes are deprecated in IEEE802.11-2016 specifications and are recommended not to be used. These modes c    an be rejected using authmode threshold by setting threshold as WPA2 by threshold.authmode as WIFI_AUTH_WPA2_PSK.
 
 AP Basic Configuration
 +++++++++++++++++++++++++++++++++++++
@@ -1416,7 +1418,7 @@ In maximum power save mode, station wakes up every listen interval to receive be
 
 Call ``esp_wifi_set_ps(WIFI_PS_MIN_MODEM)`` to enable Modem-sleep minimum power save mode or ``esp_wifi_set_ps(WIFI_PS_MAX_MODEM)`` to enable Modem-sleep maximum power save mode after calling :cpp:func:`esp_wifi_init`. When station connects to AP, Modem-sleep will start. When station disconnects from AP, Modem-sleep will stop.
 
-Call `esp_wifi_set_ps(WIFI_PS_MIN_MODEM)` to disable modem sleep entirely. This has much higher power consumption, but provides minimum latency for receiving Wi-Fi data in real time. When modem sleep is enabled, received Wi-Fi data can be delayed for as long as the DTIM period (minimum power save mode) or the listen interval (maximum power save mode).
+Call ``esp_wifi_set_ps(WIFI_PS_NONE)`` to disable modem sleep entirely. This has much higher power consumption, but provides minimum latency for receiving Wi-Fi data in real time. When modem sleep is enabled, received Wi-Fi data can be delayed for as long as the DTIM period (minimum power save mode) or the listen interval (maximum power save mode). Disabling modem sleep entirely is not possible for Wi-Fi and Bluetooth coexist mode.
 
 The default Modem-sleep mode is WIFI_PS_MIN_MODEM.
 
@@ -1462,8 +1464,6 @@ When the throughput is tested by iperf example, the sdkconfig is :idf_file:`exam
 
 Wi-Fi 80211 Packet Send
 ---------------------------
-
-**Important notes: The API esp_wifi_80211_tx is not available in IDF 2.1, but will be so in the upcoming release.**
 
 The esp_wifi_80211_tx API can be used to:
 

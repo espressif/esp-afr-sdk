@@ -219,6 +219,7 @@ void gatt_act_write (tGATT_CLCB *p_clcb, UINT8 sec_act)
     if (p_attr) {
         switch (p_clcb->op_subtype) {
         case GATT_WRITE_NO_RSP:
+            l2ble_update_att_acl_pkt_num(L2CA_DECREASE_BTU_NUM, NULL);
             p_clcb->s_handle = p_attr->handle;
             op_code = (sec_act == GATT_SEC_SIGN_DATA) ? GATT_SIGN_CMD_WRITE : GATT_CMD_WRITE;
             rt = gatt_send_write_msg(p_tcb,
@@ -262,7 +263,7 @@ void gatt_act_write (tGATT_CLCB *p_clcb, UINT8 sec_act)
     if ((rt != GATT_SUCCESS  && rt != GATT_CMD_STARTED && rt != GATT_CONGESTED)
             || (rt != GATT_CMD_STARTED && p_clcb->op_subtype == GATT_WRITE_NO_RSP)) {
         if (rt != GATT_SUCCESS) {
-            GATT_TRACE_ERROR("gatt_act_write() failed op_code=0x%x rt=%d", op_code, rt);
+            GATT_TRACE_DEBUG("gatt_act_write() failed op_code=0x%x rt=%d", op_code, rt);
         }
         gatt_end_operation(p_clcb, rt, NULL);
     }

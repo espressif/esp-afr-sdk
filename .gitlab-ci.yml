@@ -19,10 +19,19 @@ variables:
   GET_SOURCES_ATTEMPTS: "10"
   ARTIFACT_DOWNLOAD_ATTEMPTS: "10"
 
-  # We use get-full-sources.sh script to fetch the submodules and/or re-fetch the repo
-  # if it was corrupted (if submodule update fails this can happen)
-  GIT_STRATEGY: fetch
+  # GIT_STRATEGY is not defined here.
+  # Use an option from  "CI / CD Settings" - "General pipelines".
+
+  # we will download archive for each submodule instead of clone.
+  # we don't do "recursive" when fetch submodule as they're not used in CI now.
   GIT_SUBMODULE_STRATEGY: none
+  SUBMODULE_FETCH_TOOL: "tools/ci/ci_fetch_submodule.py"
+  # by default we will fetch all submodules
+  # jobs can overwrite this variable to only fetch submodules they required
+  # set to "none" if don't need to fetch submodules
+  SUBMODULES_TO_FETCH: "all"
+  # tell build system do not check submodule update as we download archive instead of clone
+  IDF_SKIP_CHECK_SUBMODULES: 1
 
   UNIT_TEST_BUILD_SYSTEM: make
 # IDF environment
@@ -33,21 +42,17 @@ variables:
   APPLY_BOT_FILTER_SCRIPT: "$CI_PROJECT_DIR/tools/ci/apply_bot_filter.py"
   CHECKOUT_REF_SCRIPT: "$CI_PROJECT_DIR/tools/ci/checkout_project_ref.py"
 
-# Docker images
+  # Docker images
   BOT_DOCKER_IMAGE_TAG: ":latest"
+  # target test repo parameters
+  TEST_ENV_CONFIG_REPO: "https://gitlab-ci-token:${BOT_TOKEN}@${CI_SERVER_HOST}:${CI_SERVER_PORT}/qa/ci-test-runner-configs.git"
+  CI_AUTO_TEST_SCRIPT_REPO_URL: "https://gitlab-ci-token:${BOT_TOKEN}@${CI_SERVER_HOST}:${CI_SERVER_PORT}/qa/auto_test_script.git"
+  CI_AUTO_TEST_SCRIPT_REPO_BRANCH: "ci/v3.1"
 
-# When 'fetch' strategy is used, Gitlab removes untracked files before checking out
-# new revision. However if the new revision doesn't include some of the submodules
-# which were present in the old revision, such submodule directories would not be
-# removed by the checkout. This extra step ensures that these stale submodules
-# are removed.
-.git_clean_stale_submodules:  &git_clean_stale_submodules >
-  find . -name '.git' -not -path './.git' -printf '%P\n'
-  | sed 's|/.git||'
-  | xargs -I {} sh -c '
-  grep -q {} .gitmodules
-  ||  (echo "Removing {}, has .git directory but not in .gitmodules file"
-  && rm -rf {});'
+# Versioned esp-idf-doc env image to use for all document building jobs
+  ESP_IDF_DOC_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-idf-doc-env:v7"
+
+
 
 # before each job, we need to check if this job is filtered by bot stage/job filter
 .apply_bot_filter: &apply_bot_filter
@@ -58,9 +63,14 @@ variables:
   tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)" || exit 1
   fi
 
+.show_submodule_urls: &show_submodule_urls |
+  git config --get-regexp '^submodule\..*\.url$' || true
+
+.fetch_submodules: &fetch_submodules |
+  python $SUBMODULE_FETCH_TOOL -s $SUBMODULES_TO_FETCH
+
 before_script:
   - source tools/ci/setup_python.sh
-  - *git_clean_stale_submodules
   # apply bot filter in before script
   - *apply_bot_filter
   # add gitlab ssh key
@@ -70,48 +80,33 @@ before_script:
   - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 > ~/.ssh/id_rsa
   - chmod 600 ~/.ssh/id_rsa
   - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+  - if [ "${LOCAL_GITLAB_SSH_SERVER:-}" ]; then SRV=${LOCAL_GITLAB_SSH_SERVER##*@};SRV=${SRV%%:*};printf "Host %s\n\tStrictHostKeyChecking no\n" "${SRV}" >> ~/.ssh/config; fi
   # Download and install tools, if needed
   - *setup_tools_unless_target_test
-
-  # Set IS_PRIVATE or IS_PUBLIC depending on if our branch is public or not
-  #
-  # (the same regular expressions are used to set these are used in 'only:' sections below
+  # Set some options and environment for CI
   - source tools/ci/configure_ci_environment.sh
-
-  # fetch the submodules (& if necessary re-fetch repo) from gitlab
-  - time ./tools/ci/get-full-sources.sh
+  - export PYTHONPATH="${PYTHONPATH}:${CI_PROJECT_DIR}/tools/ci/python_packages"
+  - *fetch_submodules
 
 # used for check scripts which we want to run unconditionally
-.do_nothing_before_no_filter:
-  before_script: &do_nothing_before_no_filter
+.before_script_lesser_nofilter: &before_script_lesser_nofilter
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  before_script:
+    - echo "Not setting up GitLab key, not fetching submodules, not applying bot filter"
     - source tools/ci/setup_python.sh
-    - *git_clean_stale_submodules
+    - source tools/ci/configure_ci_environment.sh
 
 # used for everything else where we want to do no prep, except for bot filter
-.do_nothing_before:
-  before_script: &do_nothing_before
-    - source tools/ci/setup_python.sh
-    - *git_clean_stale_submodules
-    # apply bot filter in before script
-    - *apply_bot_filter
+.before_script_lesser: &before_script_lesser
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  before_script:
     - echo "Not setting up GitLab key, not fetching submodules"
-    - source tools/ci/configure_ci_environment.sh
-
-.add_gitlab_key_before:
-  before_script: &add_gitlab_key_before
     - source tools/ci/setup_python.sh
-    - *git_clean_stale_submodules
     # apply bot filter in before script
     - *apply_bot_filter
-    - echo "Not fetching submodules"
     - source tools/ci/configure_ci_environment.sh
-    # add gitlab ssh key
-    - mkdir -p ~/.ssh
-    - chmod 700 ~/.ssh
-    - echo -n $GITLAB_KEY > ~/.ssh/id_rsa_base64
-    - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 
 build_template_app:
   stage: build
@@ -291,25 +286,18 @@ build_examples_cmake:
     - mkdir -p ${LOG_PATH}
     - ${IDF_PATH}/tools/ci/build_examples_cmake.sh
 
-build_docs:
+
+.build_docs_template: &build_docs_template
   stage: build
-  image: $CI_DOCKER_REGISTRY/esp32-ci-env$BOT_DOCKER_IMAGE_TAG
+  image: $ESP_IDF_DOC_ENV_IMAGE
   tags:
     - build_docs
   artifacts:
     when: always
     paths:
-      # English version of documentation
-      - docs/en/doxygen-warning-log.txt
-      - docs/en/sphinx-warning-log.txt
-      - docs/en/sphinx-warning-log-sanitized.txt
-      - docs/en/_build/html
-      - docs/sphinx-err-*
-      # Chinese version of documentation
-      - docs/zh_CN/doxygen-warning-log.txt
-      - docs/zh_CN/sphinx-warning-log.txt
-      - docs/zh_CN/sphinx-warning-log-sanitized.txt
-      - docs/zh_CN/_build/html
+      - docs/*/*.txt
+      - docs/_build/*/html/*
+      - docs/_build/*/latex/*
     expire_in: 4 days
   only:
     variables:
@@ -317,17 +305,32 @@ build_docs:
       - $BOT_LABEL_BUILD
       - $BOT_LABEL_BUILD_DOCS
       - $BOT_LABEL_REGULAR_TEST
+  dependencies: []
   script:
+    # Active python 3.6.10 env as this is where Sphinx is installed
+    - source /opt/pyenv/activate && pyenv global 3.6.10
+      # Setup a build dir with both languages to simplify deployment
     - cd docs
+    - mkdir -p _build/$DOCLANG
     - ./check_lang_folder_sync.sh
-    - cd en
+    - cd $DOCLANG
     - make gh-linkcheck
     - make html
     - ../check_doc_warnings.sh
-    - cd ../zh_CN
-    - make gh-linkcheck
-    - make html
+    - make latexpdf LATEXMKOPTS="--f --interaction=nonstopmode --quiet --outdir=build"
     - ../check_doc_warnings.sh
+    - mv -f _build/* ../_build/$DOCLANG
+
+build_docs_en:
+  extends: .build_docs_template
+  variables:
+    DOCLANG: "en"
+
+build_docs_zh_CN:
+  extends: .build_docs_template
+  variables:
+    DOCLANG: "zh_CN"
+
 
 .check_job_template: &check_job_template
   stage: check
@@ -335,7 +338,7 @@ build_docs:
   tags:
     - host_test
   dependencies: []
-  before_script: *do_nothing_before_no_filter
+  <<: *before_script_lesser_nofilter
 
 verify_cmake_style:
   <<: *check_job_template
@@ -363,7 +366,11 @@ build_docker:
     DOCKER_TMP_IMAGE_NAME: "idf_tmp_image"
   before_script: []
   script:
-    - export DOCKER_BUILD_ARGS="--build-arg IDF_CLONE_URL=${CI_REPOSITORY_URL} --build-arg IDF_CLONE_BRANCH_OR_TAG=${CI_COMMIT_REF_NAME} --build-arg IDF_CHECKOUT_REF=${CI_COMMIT_TAG:-$CI_COMMIT_SHA}"
+    - export LOCAL_CI_REPOSITORY_URL=$CI_REPOSITORY_URL
+    - if [ -n "$LOCAL_GITLAB_HTTPS_HOST" ]; then export LOCAL_CI_REPOSITORY_URL="https://gitlab-ci-token:${CI_JOB_TOKEN}@${LOCAL_GITLAB_HTTPS_HOST}/${CI_PROJECT_PATH}"; fi
+    - echo "Using repository at $LOCAL_CI_REPOSITORY_URL"
+    - export DOCKER_BUILD_ARGS="--build-arg IDF_CLONE_URL=${LOCAL_CI_REPOSITORY_URL} --build-arg IDF_CLONE_BRANCH_OR_TAG=${CI_COMMIT_REF_NAME} --build-arg IDF_CHECKOUT_REF=${CI_COMMIT_TAG:-$CI_COMMIT_SHA}"
+
     # Build
     - docker build --tag ${DOCKER_TMP_IMAGE_NAME} ${DOCKER_BUILD_ARGS} tools/docker/
     # We can't mount $PWD/examples/get-started/blink into the container, see https://gitlab.com/gitlab-org/gitlab-ce/issues/41227.
@@ -605,7 +612,7 @@ push_to_github:
       - $BOT_TRIGGER_WITH_LABEL == null
   when: on_success
   dependencies: []
-  before_script: *do_nothing_before
+  <<: *before_script_lesser
   script:
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
@@ -617,45 +624,67 @@ push_to_github:
     - git remote add github git@github.com:espressif/esp-idf.git
     - tools/ci/push_to_github.sh
 
-deploy_docs:
+.deploy_docs_template:
+  extends: .before_script_lesser
   stage: deploy
-  image: $CI_DOCKER_REGISTRY/esp32-ci-env$BOT_DOCKER_IMAGE_TAG
+  image: $ESP_IDF_DOC_ENV_IMAGE
   tags:
     - deploy
     - shiny
+  dependencies:
+    - build_docs_en
+    - build_docs_zh_CN
+  variables:
+    DOCS_BUILD_DIR: "${IDF_PATH}/docs/_build/"
+    PYTHONUNBUFFERED: 1
+  script:
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo -n $DOCS_DEPLOY_PRIVATEKEY > ~/.ssh/id_rsa_base64
+    - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - echo -e "Host $DOCS_DEPLOY_SERVER\n\tStrictHostKeyChecking no\n\tUser $DOCS_DEPLOY_SERVER_USER\n" >> ~/.ssh/config
+    - export GIT_VER=$(git describe --always)
+
+    - ${IDF_PATH}/tools/ci/multirun_with_pyenv.sh -p 3.6.10 ${IDF_PATH}/tools/ci/deploy_docs.py
+
+
+# deploys docs to CI_DOCKER_REGISTRY webserver, for internal review
+deploy_docs_preview:
+  extends: .deploy_docs_template
   only:
     refs:
-      - master
-      - /^release\/v/
-      - /^v\d+\.\d+(\.\d+)?($|-)/
       - triggers
     variables:
       - $BOT_TRIGGER_WITH_LABEL == null
       - $BOT_LABEL_BUILD_DOCS
-  dependencies:
-    - build_docs
-  before_script: *do_nothing_before
-  script:
-    - mkdir -p ~/.ssh
-    - chmod 700 ~/.ssh
-    - echo -n $DOCS_DEPLOY_KEY > ~/.ssh/id_rsa_base64
-    - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - echo -e "Host $DOCS_SERVER\n\tStrictHostKeyChecking no\n\tUser $DOCS_SERVER_USER\n" >> ~/.ssh/config
-    - export GIT_VER=$(git describe --always)
-    - cd docs/en/_build/
-    - mv html $GIT_VER
-    - tar czvf $GIT_VER.tar.gz $GIT_VER
-    - scp $GIT_VER.tar.gz $DOCS_SERVER:$DOCS_PATH/en
-    - ssh $DOCS_SERVER -x "cd $DOCS_PATH/en && tar xzvf $GIT_VER.tar.gz && rm -f latest && ln -s $GIT_VER latest"
-    - cd ../../zh_CN/_build/
-    - mv html $GIT_VER
-    - tar czvf $GIT_VER.tar.gz $GIT_VER
-    - scp $GIT_VER.tar.gz $DOCS_SERVER:$DOCS_PATH/zh_CN
-    - ssh $DOCS_SERVER -x "cd $DOCS_PATH/zh_CN && tar xzvf $GIT_VER.tar.gz && rm -f latest && ln -s $GIT_VER latest"
-    # add link to preview doc
-    - echo "[document preview][en] $CI_DOCKER_REGISTRY/docs/esp-idf/en/${GIT_VER}/index.html"
-    - echo "[document preview][zh_CN] $CI_DOCKER_REGISTRY/docs/esp-idf/zh_CN/${GIT_VER}/index.html"
+  variables:
+    TYPE: "preview"
+    # older branches use DOCS_DEPLOY_KEY, DOCS_SERVER, DOCS_SERVER_USER, DOCS_PATH for preview server so we keep these names for 'preview'
+    DOCS_DEPLOY_PRIVATEKEY: "$DOCS_DEPLOY_KEY"
+    DOCS_DEPLOY_SERVER: "$DOCS_SERVER"
+    DOCS_DEPLOY_SERVER_USER: "$DOCS_SERVER_USER"
+    DOCS_DEPLOY_PATH: "$DOCS_PATH"
+    DOCS_DEPLOY_URL_BASE: "https://$CI_DOCKER_REGISTRY/docs/esp-idf"
+
+# deploy docs to production webserver
+deploy_docs_production:
+  extends: .deploy_docs_template
+  only:
+    refs:
+      # The DOCS_PROD_* variables used by this job are "Protected" so these branches must all be marked "Protected" in Gitlab settings
+      - master
+      - /^release\/v/
+      - /^v\d+\.\d+(\.\d+)?($|-)/
+    variables:
+      - $BOT_TRIGGER_WITH_LABEL == null
+  variables:
+    TYPE: "preview"
+    DOCS_DEPLOY_PRIVATEKEY: "$DOCS_PROD_DEPLOY_KEY"
+    DOCS_DEPLOY_SERVER: "$DOCS_PROD_SERVER"
+    DOCS_DEPLOY_SERVER_USER: "$DOCS_PROD_SERVER_USER"
+    DOCS_DEPLOY_PATH: "$DOCS_PROD_PATH"
+    DOCS_DEPLOY_URL_BASE: "https://docs.espressif.com/projects/esp-idf"
 
 check_doc_links:
   stage: host_test
@@ -717,7 +746,7 @@ check_examples_cmake_make:
     - master
     - /^release\/v/
     - /^v\d+\.\d+(\.\d+)?($|-)/
-  before_script: *do_nothing_before
+  <<: *before_script_lesser
   script:
     - tools/ci/check_examples_cmake_make.sh
 
@@ -728,14 +757,13 @@ check_python_style:
     paths:
       - flake8_output.txt
     expire_in: 1 week
-  before_script: *do_nothing_before
+  <<: *before_script_lesser
   script:
     # run it only under Python 3 (it is very slow under Python 2)
     - ${IDF_PATH}/tools/ci/multirun_with_pyenv.sh -p 3.4.8 python -m flake8 --config=$IDF_PATH/.flake8 --output-file=flake8_output.txt --tee --benchmark $IDF_PATH
 
 check_kconfigs:
   <<: *check_job_template
-  before_script: *do_nothing_before
   artifacts:
     when: on_failure
     paths:
@@ -746,6 +774,7 @@ check_kconfigs:
       - tools/*/*/Kconfig*.new
       - tools/*/*/*/Kconfig*.new
     expire_in: 1 week
+  <<: *before_script_lesser
   script:
     - ${IDF_PATH}/tools/ci/multirun_with_pyenv.sh ${IDF_PATH}/tools/test_check_kconfigs.py
     - ${IDF_PATH}/tools/check_kconfigs.py
@@ -760,7 +789,7 @@ check_ut_cmake_make:
     - /^release\/v/
     - /^v\d+\.\d+(\.\d+)?($|-)/
   dependencies: []
-  before_script: *do_nothing_before
+  <<: *before_script_lesser
   script:
     - tools/ci/check_ut_cmake_make.sh
 
@@ -768,12 +797,22 @@ check_submodule_sync:
   <<: *check_job_template
   tags:
     - github_sync
+  retry: 2
   variables:
     GIT_STRATEGY: clone
-  retry: 2
+    GIT_SUBMODULE_STRATEGY: none
+    PUBLIC_IDF_URL: "https://github.com/espressif/esp-idf.git"
+  before_script: []
+  after_script: []
   script:
+    - git submodule deinit --force .
+    # setting the default remote URL to the public one, to resolve relative location URLs
+    - git config remote.origin.url ${PUBLIC_IDF_URL}
     # check if all submodules are correctly synced to public repostory
-    - git submodule update --init --recursive
+    - git submodule init
+    - *show_submodule_urls
+    - git submodule update --recursive
+    - echo "IDF was cloned from ${PUBLIC_IDF_URL} completely"
 
 check_artifacts_expire_time:
   <<: *check_job_template
@@ -792,6 +831,18 @@ check_pipeline_triggered_by_label:
     # We want to make sure some jobs are always executed to detect regression.
     - test "$BOT_LABEL_REGULAR_TEST" = "true" || exit -1
 
+# For release tag pipelines only, make sure the tag was created with 'git tag -a' so it will update
+# the version returned by 'git describe'
+check_version_tag:
+  extends: .check_job_template
+  only:
+    refs:
+      - /^v\d+\.\d+(\.\d+)?($|-)/
+    variables:
+      - $BOT_TRIGGER_WITH_LABEL == null
+  script:
+    - (git cat-file -t $CI_COMMIT_REF_NAME | grep tag) || (echo "ESP-IDF versions must be annotated tags." && exit 1)
+
 assign_test:
   tags:
     - assign_test
@@ -806,6 +857,11 @@ assign_test:
   variables:
     TEST_FW_PATH: "$CI_PROJECT_DIR/tools/tiny-test-fw"
     EXAMPLE_CONFIG_OUTPUT_PATH: "$CI_PROJECT_DIR/examples/test_configs"
+    INTEGRATION_CONFIG_OUTPUT_PATH: "${CI_PROJECT_DIR}/components/idf_test/integration_test/CIConfigs"
+    TEST_CASE_FILE_PATH: "$CI_PROJECT_DIR/auto_test_script/TestCaseFiles"
+    ASSIGN_TEST_CASE_SCRIPT: "${CI_PROJECT_DIR}/auto_test_script/bin/CIAssignTestCases.py"
+    PYTHONPATH: "${CI_PROJECT_DIR}/auto_test_script/packages"
+    PYTHON_VER: 3.7.7
   artifacts:
     paths:
       - components/idf_test/*/CIConfigs
@@ -824,11 +880,11 @@ assign_test:
     # assign unit test cases
     - python $TEST_FW_PATH/CIAssignUnitTest.py $IDF_PATH/components/idf_test/unit_test/TestCaseAll.yml $IDF_PATH/.gitlab-ci.yml $IDF_PATH/components/idf_test/unit_test/CIConfigs
     # clone test script to assign tests
-    - git clone $TEST_SCRIPT_REPOSITORY
+    - ./tools/ci/retry_failed.sh git clone ${CI_AUTO_TEST_SCRIPT_REPO_URL} -b empty_branch
+    - ./tools/ci/retry_failed.sh git -C auto_test_script checkout -f ${CI_AUTO_TEST_SCRIPT_REPO_BRANCH}
     - python $CHECKOUT_REF_SCRIPT auto_test_script auto_test_script
-    - cd auto_test_script
     # assgin integration test cases
-    - python CIAssignTestCases.py -t $IDF_PATH/components/idf_test/integration_test -c $IDF_PATH/.gitlab-ci.yml -b $IDF_PATH/SSC/ssc_bin
+    - python ${ASSIGN_TEST_CASE_SCRIPT} -t $TEST_CASE_FILE_PATH -c $IDF_PATH/.gitlab-ci.yml -b $IDF_PATH/SSC/ssc_bin -o $INTEGRATION_CONFIG_OUTPUT_PATH
 
 .define_config_file_name: &define_config_file_name |
     JOB_NAME_PREFIX=$(echo ${CI_JOB_NAME} | awk '{print $1}')
@@ -860,21 +916,25 @@ assign_test:
     reports:
         junit: $LOG_PATH/*/XUNIT_RESULT.xml
   variables:
+    SUBMODULES_TO_FETCH: "components/esptool_py/esptool"
     TEST_FW_PATH: "$CI_PROJECT_DIR/tools/tiny-test-fw"
     TEST_CASE_PATH: "$CI_PROJECT_DIR/examples"
     CONFIG_FILE_PATH: "${CI_PROJECT_DIR}/examples/test_configs"
     LOG_PATH: "$CI_PROJECT_DIR/TEST_LOGS"
     ENV_FILE: "$CI_PROJECT_DIR/ci-test-runner-configs/$CI_RUNNER_DESCRIPTION/EnvConfig.yml"
+    PYTHON_VER: 3
   script:
     - *define_config_file_name
     # first test if config file exists, if not exist, exit 0
     - test -e $CONFIG_FILE || exit 0
     # clone test env configs
-    - git clone $TEST_ENV_CONFIG_REPOSITORY
+    - ./tools/ci/retry_failed.sh git clone $TEST_ENV_CONFIG_REPO
     - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
-    - cd $TEST_FW_PATH
+    # git clone the known failure cases repo, run test
+    - ./tools/ci/retry_failed.sh git clone $KNOWN_FAILURE_CASES_REPO known_failure_cases
     # run test
-    - python Runner.py $TEST_CASE_PATH -c $CONFIG_FILE -e $ENV_FILE
+    - cd $TEST_FW_PATH
+    - python Runner.py $TEST_CASE_PATH -c $CONFIG_FILE -e $ENV_FILE --known_failure_cases_file $CI_PROJECT_DIR/known_failure_cases/known_failure_cases.txt
 
 .unit_test_template: &unit_test_template
   <<: *example_test_template
@@ -922,26 +982,30 @@ assign_test:
       - $LOG_PATH
     expire_in: 1 week
   variables:
+    SUBMODULES_TO_FETCH: "none"
     LOCAL_ENV_CONFIG_PATH: "$CI_PROJECT_DIR/ci-test-runner-configs/$CI_RUNNER_DESCRIPTION/ESP32_IDF"
-    LOG_PATH: "$CI_PROJECT_DIR/$CI_COMMIT_SHA"
-    TEST_CASE_FILE_PATH: "$CI_PROJECT_DIR/components/idf_test/integration_test"
+    LOG_PATH: "${CI_PROJECT_DIR}/TEST_LOGS"
+    TEST_CASE_FILE_PATH: "$CI_PROJECT_DIR/auto_test_script/TestCaseFiles"
     MODULE_UPDATE_FILE: "$CI_PROJECT_DIR/components/idf_test/ModuleDefinition.yml"
     CONFIG_FILE_PATH: "${CI_PROJECT_DIR}/components/idf_test/integration_test/CIConfigs"
-  before_script: *add_gitlab_key_before
+    KNOWN_ISSUE_FILE: "${CI_PROJECT_DIR}/components/idf_test/integration_test/KnownIssues"
+    PYTHONPATH: "${CI_PROJECT_DIR}/auto_test_script/packages"
+    CI_RUNNER_SCRIPT: "${CI_PROJECT_DIR}/auto_test_script/bin/CIRunner.py"
+    PYTHON_VER: 3.7.7
   script:
     - *define_config_file_name
     # first test if config file exists, if not exist, exit 0
     - test -e $CONFIG_FILE || exit 0
     # clone local test env configs
-    - git clone $TEST_ENV_CONFIG_REPOSITORY
+    - ./tools/ci/retry_failed.sh git clone $TEST_ENV_CONFIG_REPO
     - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
-    - cd ci-test-runner-configs
     # clone test bench
-    - git clone $TEST_SCRIPT_REPOSITORY
+    - ./tools/ci/retry_failed.sh git clone ${CI_AUTO_TEST_SCRIPT_REPO_URL} -b empty_branch
+    - ./tools/ci/retry_failed.sh git -C auto_test_script checkout -f ${CI_AUTO_TEST_SCRIPT_REPO_BRANCH}
     - python $CHECKOUT_REF_SCRIPT auto_test_script auto_test_script
-    - cd auto_test_script
+    - cat ${KNOWN_ISSUE_FILE} >> ${TEST_CASE_FILE_PATH}/KnownIssues
     # run test
-    - python CIRunner.py -l "$LOG_PATH/$JOG_FULL_NAME" -c $CONFIG_FILE -e $LOCAL_ENV_CONFIG_PATH -t $TEST_CASE_FILE_PATH
+    - python ${CI_RUNNER_SCRIPT} -l "$LOG_PATH/$JOG_FULL_NAME" -c $CONFIG_FILE -e $LOCAL_ENV_CONFIG_PATH -t $TEST_CASE_FILE_PATH
 
 nvs_compatible_test:
   <<: *test_template
@@ -959,17 +1023,17 @@ nvs_compatible_test:
     # first test if config file exists, if not exist, exit 0
     - test -e $CONFIG_FILE || exit 0
     # clone local test env configs
-    - git clone $TEST_ENV_CONFIG_REPOSITORY
+    - ./tools/ci/retry_failed.sh git clone $TEST_ENV_CONFIG_REPO
     - python $CHECKOUT_REF_SCRIPT ci-test-runner-configs ci-test-runner-configs
-    - cd ci-test-runner-configs
     # clone test bench
-    - git clone $TEST_SCRIPT_REPOSITORY
-    - python $CHECKOUT_REF_SCRIPT auto_test_script auto_test_script
-    - cd auto_test_script
+    - ./tools/ci/retry_failed.sh git clone ${CI_AUTO_TEST_SCRIPT_REPO_URL} -b empty_branch
+    - ./tools/ci/retry_failed.sh git -C auto_test_script checkout -f ${CI_AUTO_TEST_SCRIPT_REPO_BRANCH}
+    - python $CHECKOUT_REF_SCRIPT auto_test_script "$CI_PROJECT_DIR/auto_test_script/TestCaseFiles"
     # prepare nvs bins
-    - ./Tools/prepare_nvs_bin.sh
+    - cd auto_test_script
+    - ./tools/prepare_nvs_bin.sh
     # run test
-    - python CIRunner.py -l "$LOG_PATH/$JOG_FULL_NAME" -c $CONFIG_FILE -e $LOCAL_ENV_CONFIG_PATH -t $TEST_CASE_FILE_PATH
+    - python ${CI_RUNNER_SCRIPT} -l "$LOG_PATH/$JOG_FULL_NAME" -c $CONFIG_FILE -e $LOCAL_ENV_CONFIG_PATH -t $TEST_CASE_FILE_PATH
 
 example_test_001:
   <<: *example_test_template
@@ -984,6 +1048,14 @@ example_test_002:
   tags:
     - ESP32
     - Example_ShieldBox_Basic
+  variables:
+    SUBMODULES_TO_FETCH: "all"
+    TEST_FW_PATH: "$CI_PROJECT_DIR/tools/tiny-test-fw"
+    TEST_CASE_PATH: "$CI_PROJECT_DIR/examples"
+    CONFIG_FILE_PATH: "${CI_PROJECT_DIR}/examples/test_configs"
+    LOG_PATH: "$CI_PROJECT_DIR/TEST_LOGS"
+    ENV_FILE: "$CI_PROJECT_DIR/ci-test-runner-configs/$CI_RUNNER_DESCRIPTION/EnvConfig.yml"
+    PYTHON_VER: 3
 
 .example_test_003:
   <<: *example_test_template
@@ -1324,7 +1396,7 @@ IT_002:
 
 IT_003:
   <<: *test_template
-  parallel: 13
+  parallel: 14
   tags:
     - ESP32_IDF
     - SSC_T2_5
@@ -1344,7 +1416,7 @@ IT_005:
 
 IT_006:
   <<: *test_template
-  parallel: 8
+  parallel: 13
   tags:
     - ESP32_IDF
     - SSC_T1_6
@@ -1367,13 +1439,6 @@ IT_009:
   tags:
     - ESP32_IDF
     - SSC_T1_3
-
-IT_010:
-  <<: *test_template
-  parallel: 4
-  tags:
-    - ESP32_IDF
-    - SSC_T5_1
 
 IT_011:
   <<: *test_template
@@ -1414,6 +1479,7 @@ IT_015:
 
 IT_016:
   <<: *test_template
+  allow_failure: true
   tags:
     - ESP32_IDF
     - SSC_T50_MESH1
@@ -1426,7 +1492,6 @@ IT_017:
 
 IT_018:
   <<: *test_template
-  parallel: 2
   tags:
     - ESP32_IDF
     - SSC_T1_9

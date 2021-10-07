@@ -29,6 +29,10 @@ esp_err_t esp_a2d_sink_init(void)
         return ESP_ERR_INVALID_STATE;
     }
 
+    if (g_a2dp_on_init || g_a2dp_sink_ongoing_deinit) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     btc_msg_t msg;
 
     msg.sig = BTC_SIG_API_CALL;
@@ -43,6 +47,10 @@ esp_err_t esp_a2d_sink_init(void)
 esp_err_t esp_a2d_sink_deinit(void)
 {
     if (esp_bluedroid_get_status() != ESP_BLUEDROID_STATUS_ENABLED) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (g_a2dp_on_deinit || g_a2dp_sink_ongoing_deinit) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -63,6 +71,10 @@ esp_err_t esp_a2d_sink_register_data_callback(esp_a2d_sink_data_cb_t callback)
         return ESP_ERR_INVALID_STATE;
     }
 
+    if (g_a2dp_sink_ongoing_deinit) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     btc_msg_t msg;
     msg.sig = BTC_SIG_API_CALL;
     msg.pid = BTC_PID_A2DP;
@@ -80,6 +92,10 @@ esp_err_t esp_a2d_sink_register_data_callback(esp_a2d_sink_data_cb_t callback)
 esp_err_t esp_a2d_sink_connect(esp_bd_addr_t remote_bda)
 {
     if (esp_bluedroid_get_status() != ESP_BLUEDROID_STATUS_ENABLED) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (g_a2dp_on_deinit || g_a2dp_sink_ongoing_deinit) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -105,15 +121,21 @@ esp_err_t esp_a2d_sink_disconnect(esp_bd_addr_t remote_bda)
         return ESP_ERR_INVALID_STATE;
     }
 
+    if (g_a2dp_on_deinit || g_a2dp_sink_ongoing_deinit) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     bt_status_t stat;
     btc_msg_t msg;
+    btc_av_args_t arg;
 
     msg.sig = BTC_SIG_API_CALL;
     msg.pid = BTC_PID_A2DP;
     msg.act = BTC_AV_SINK_API_DISCONNECT_EVT;
 
     /* Switch to BTC context */
-    stat = btc_transfer_context(&msg, NULL, 0, NULL);
+    memcpy(&(arg.disconn), remote_bda, sizeof(bt_bdaddr_t));
+    stat = btc_transfer_context(&msg, &arg, sizeof(btc_av_args_t), NULL);
     return (stat == BT_STATUS_SUCCESS) ? ESP_OK : ESP_FAIL;
 }
 
@@ -122,6 +144,10 @@ esp_err_t esp_a2d_sink_disconnect(esp_bd_addr_t remote_bda)
 esp_err_t esp_a2d_register_callback(esp_a2d_cb_t callback)
 {
     if (esp_bluedroid_get_status() != ESP_BLUEDROID_STATUS_ENABLED) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (g_a2dp_sink_ongoing_deinit || g_a2dp_source_ongoing_deinit) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -136,6 +162,10 @@ esp_err_t esp_a2d_register_callback(esp_a2d_cb_t callback)
 esp_err_t esp_a2d_media_ctrl(esp_a2d_media_ctrl_t ctrl)
 {
     if (esp_bluedroid_get_status() != ESP_BLUEDROID_STATUS_ENABLED) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (g_a2dp_on_deinit || g_a2dp_sink_ongoing_deinit || g_a2dp_source_ongoing_deinit) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -162,6 +192,10 @@ esp_err_t esp_a2d_source_init(void)
         return ESP_ERR_INVALID_STATE;
     }
 
+    if (g_a2dp_on_init || g_a2dp_source_ongoing_deinit) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     btc_msg_t msg;
 
     msg.sig = BTC_SIG_API_CALL;
@@ -179,6 +213,10 @@ esp_err_t esp_a2d_source_deinit(void)
         return ESP_ERR_INVALID_STATE;
     }
 
+    if (g_a2dp_on_deinit || g_a2dp_source_ongoing_deinit) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     btc_msg_t msg;
 
     msg.sig = BTC_SIG_API_CALL;
@@ -193,6 +231,10 @@ esp_err_t esp_a2d_source_deinit(void)
 esp_err_t esp_a2d_source_connect(esp_bd_addr_t remote_bda)
 {
     if (esp_bluedroid_get_status() != ESP_BLUEDROID_STATUS_ENABLED) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (g_a2dp_on_deinit || g_a2dp_source_ongoing_deinit) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -218,21 +260,33 @@ esp_err_t esp_a2d_source_disconnect(esp_bd_addr_t remote_bda)
         return ESP_ERR_INVALID_STATE;
     }
 
+    if (g_a2dp_on_deinit || g_a2dp_source_ongoing_deinit) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     bt_status_t stat;
+    btc_av_args_t arg;
     btc_msg_t msg;
 
     msg.sig = BTC_SIG_API_CALL;
     msg.pid = BTC_PID_A2DP;
     msg.act = BTC_AV_SRC_API_DISCONNECT_EVT;
 
+    memset(&arg, 0, sizeof(btc_av_args_t));
+
     /* Switch to BTC context */
-    stat = btc_transfer_context(&msg, NULL, 0, NULL);
+    memcpy(&(arg.src_disconn), remote_bda, sizeof(bt_bdaddr_t));
+    stat = btc_transfer_context(&msg, &arg, sizeof(btc_av_args_t), NULL);
     return (stat == BT_STATUS_SUCCESS) ? ESP_OK : ESP_FAIL;
 }
 
 esp_err_t esp_a2d_source_register_data_callback(esp_a2d_source_data_cb_t callback)
 {
     if (esp_bluedroid_get_status() != ESP_BLUEDROID_STATUS_ENABLED) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (g_a2dp_source_ongoing_deinit) {
         return ESP_ERR_INVALID_STATE;
     }
 

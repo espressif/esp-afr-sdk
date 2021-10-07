@@ -937,7 +937,9 @@ TEST_CASE("spi_speed","[spi]")
     for (int i = 0; i < TEST_TIMES; i++) {
         ESP_LOGI(TAG, "%d", t_flight_sorted[i]);
     }
+#ifndef CONFIG_SPIRAM_SUPPORT
     TEST_PERFORMANCE_LESS_THAN(SPI_PER_TRANS_NO_POLLING, "%d us", t_flight_sorted[(TEST_TIMES+1)/2]);
+#endif
 
     //acquire the bus to send polling transactions faster
     ret = spi_device_acquire_bus(spi, portMAX_DELAY);
@@ -952,7 +954,9 @@ TEST_CASE("spi_speed","[spi]")
     for (int i = 0; i < TEST_TIMES; i++) {
         ESP_LOGI(TAG, "%d", t_flight_sorted[i]);
     }
+#ifndef CONFIG_SPIRAM_SUPPORT
     TEST_PERFORMANCE_LESS_THAN(SPI_PER_TRANS_POLLING, "%d us", t_flight_sorted[(TEST_TIMES+1)/2]);
+#endif
 
     //release the bus
     spi_device_release_bus(spi);
@@ -970,7 +974,9 @@ TEST_CASE("spi_speed","[spi]")
     for (int i = 0; i < TEST_TIMES; i++) {
         ESP_LOGI(TAG, "%d", t_flight_sorted[i]);
     }
+#ifndef CONFIG_SPIRAM_SUPPORT
     TEST_PERFORMANCE_LESS_THAN( SPI_PER_TRANS_NO_POLLING_NO_DMA, "%d us", t_flight_sorted[(TEST_TIMES+1)/2]);
+#endif
 
     //acquire the bus to send polling transactions faster
     ret = spi_device_acquire_bus(spi, portMAX_DELAY);
@@ -984,7 +990,9 @@ TEST_CASE("spi_speed","[spi]")
     for (int i = 0; i < TEST_TIMES; i++) {
         ESP_LOGI(TAG, "%d", t_flight_sorted[i]);
     }
+#ifndef CONFIG_SPIRAM_SUPPORT
     TEST_PERFORMANCE_LESS_THAN(SPI_PER_TRANS_POLLING_NO_DMA, "%d us", t_flight_sorted[(TEST_TIMES+1)/2]);
+#endif
 
     //release the bus
     spi_device_release_bus(spi);
@@ -1113,9 +1121,9 @@ TEST_CASE("spi poll tasks","[spi]")
     ret=spi_bus_add_device(HSPI_HOST, &devcfg, &context3.handle);
     TEST_ASSERT(ret==ESP_OK);
 
-    xTaskCreate( spi_task1, "task1", 2048, &context1, 0, &task1 );
-    xTaskCreate( spi_task2, "task2", 2048, &context2, 0, &task2 );
-    xTaskCreate( spi_task3, "task3", 2048, &context3, 0, &task3 );
+    xTaskCreate( spi_task1, "task1", 3072, &context1, 0, &task1 );
+    xTaskCreate( spi_task2, "task2", 3072, &context2, 0, &task2 );
+    xTaskCreate( spi_task3, "task3", 3072, &context3, 0, &task3 );
 
     for(;;){
         vTaskDelay(10);
