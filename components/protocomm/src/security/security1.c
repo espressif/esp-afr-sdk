@@ -24,7 +24,7 @@
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/ecdh.h>
 #include <mbedtls/error.h>
-#include <mbedtls/ssl_internal.h>
+#include <mbedtls/constant_time.h>
 
 #include <protocomm_security.h>
 #include <protocomm_security1.h>
@@ -116,7 +116,7 @@ static esp_err_t handle_session_command1(session_t *cur_session,
     hexdump("Dec Client verifier", check_buf, sizeof(check_buf));
 
     /* constant time memcmp */
-    if (mbedtls_ssl_safer_memcmp(check_buf, cur_session->device_pubkey,
+    if (mbedtls_ct_memcmp(check_buf, cur_session->device_pubkey,
                                  sizeof(cur_session->device_pubkey)) != 0) {
         ESP_LOGE(TAG, "Key mismatch. Close connection");
         mbedtls_aes_free(&cur_session->ctx_aes);
