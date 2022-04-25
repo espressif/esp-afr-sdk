@@ -130,6 +130,8 @@ typedef struct {
     uint8_t tx_brk_len;                 /*!< TX break signal cycle length/number */
     uint8_t tx_waiting_brk;             /*!< Flag to indicate that TX FIFO is ready to send break signal after FIFO is empty, do not push data into TX FIFO right now.*/
     uart_select_notif_callback_t uart_select_notif_callback; /*!< Notification about select() events */
+    uart_isr_cb_t uart_isr_cb;          /*!< UART Callback */
+    void *param;                        /*!< UART Callback parameter*/
     QueueHandle_t event_queue;          /*!< UART event queue handler*/
     RingbufHandle_t rx_ring_buf;        /*!< RX ring buffer handler*/
     RingbufHandle_t tx_ring_buf;        /*!< TX ring buffer handler*/
@@ -650,6 +652,29 @@ esp_err_t uart_isr_free(uart_port_t uart_num)
     return ret;
 }
 
+esp_err_t uart_register_callback_with_isr(uart_port_t uart_num, uart_isr_cb_t uart_isr_cb, void *param)
+{
+    ESP_RETURN_ON_FALSE((uart_num < UART_NUM_MAX), ESP_FAIL, UART_TAG, "uart_num error");
+    ESP_RETURN_ON_FALSE(uart_isr_cb, ESP_FAIL, UART_TAG, "uart cb function cannot be NULL");
+    ESP_RETURN_ON_FALSE((p_uart_obj[uart_num]), ESP_FAIL, UART_TAG, "uart driver error");
+    UART_ENTER_CRITICAL(&(uart_context[uart_num].spinlock));
+    p_uart_obj[uart_num]->uart_isr_cb = uart_isr_cb;
+    p_uart_obj[uart_num]->param = param;
+    UART_EXIT_CRITICAL(&(uart_context[uart_num].spinlock));
+    return ESP_OK;
+}
+
+esp_err_t uart_deregister_callback_with_isr(uart_port_t uart_num)
+{
+    ESP_RETURN_ON_FALSE((uart_num < UART_NUM_MAX), ESP_FAIL, UART_TAG, "uart_num error");
+    ESP_RETURN_ON_FALSE((p_uart_obj[uart_num]), ESP_FAIL, UART_TAG, "uart driver error");
+    UART_ENTER_CRITICAL(&(uart_context[uart_num].spinlock));
+    p_uart_obj[uart_num]->uart_isr_cb = NULL;
+    p_uart_obj[uart_num]->param = NULL;
+    UART_EXIT_CRITICAL(&(uart_context[uart_num].spinlock));
+    return ESP_OK;
+}
+
 static bool uart_try_set_iomux_pin(uart_port_t uart_num, int io_num, uint32_t idx)
 {
     /* Store a pointer to the default pin, to optimize access to its fields. */
@@ -973,6 +998,9 @@ static void UART_ISR_ATTR uart_rx_intr_handler_default(void *param)
                     UART_EXIT_CRITICAL_ISR(&uart_selectlock);
                 }
                 p_uart->rx_stash_len = rx_fifo_len;
+                if (p_uart_obj[uart_num]->uart_isr_cb) {
+                    p_uart_obj[uart_num]->uart_isr_cb(uart_event, p_uart_obj[uart_num]->param);
+                }
                 //If we fail to push data to ring buffer, we will have to stash the data, and send next time.
                 //Mainly for applications that uses flow control or small ring buffer.
                 if (pdFALSE == xRingbufferSendFromISR(p_uart->rx_ring_buf, p_uart->rx_data_buf, p_uart->rx_stash_len, &HPTaskAwoken)) {
@@ -1109,7 +1137,11 @@ static void UART_ISR_ATTR uart_rx_intr_handler_default(void *param)
                     uart_hal_set_rts(&(uart_context[uart_num].hal), 1);
                 }
                 UART_EXIT_CRITICAL_ISR(&(uart_context[uart_num].spinlock));
+                uart_event.type = UART_TX_DONE;
                 xSemaphoreGiveFromISR(p_uart_obj[uart_num]->tx_done_sem, &HPTaskAwoken);
+                if (p_uart_obj[uart_num]->uart_isr_cb) {
+                    p_uart_obj[uart_num]->uart_isr_cb(uart_event, p_uart_obj[uart_num]->param);
+                }
             }
         } else {
             uart_hal_clr_intsts_mask(&(uart_context[uart_num].hal), uart_intr_status); /*simply clear all other intr status*/
