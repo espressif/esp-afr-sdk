@@ -19,6 +19,8 @@ static const char __attribute__((__unused__)) *RTCIO_TAG = "RTCIO";
 extern portMUX_TYPE rtc_spinlock; //TODO: Will be placed in the appropriate position after the rtc module is finished.
 #define RTCIO_ENTER_CRITICAL()  portENTER_CRITICAL(&rtc_spinlock)
 #define RTCIO_EXIT_CRITICAL()  portEXIT_CRITICAL(&rtc_spinlock)
+#define RTCIO_ENTER_CRITICAL_SAFE() portENTER_CRITICAL_SAFE(&rtc_spinlock)
+#define RTCIO_EXIT_CRITICAL_SAFE() portEXIT_CRITICAL_SAFE(&rtc_spinlock)
 
 #if SOC_RTCIO_INPUT_OUTPUT_SUPPORTED
 
@@ -107,9 +109,9 @@ esp_err_t rtc_gpio_set_direction_in_sleep(gpio_num_t gpio_num, rtc_gpio_mode_t m
 esp_err_t rtc_gpio_pullup_en(gpio_num_t gpio_num)
 {
     ESP_RETURN_ON_FALSE(rtc_gpio_is_valid_gpio(gpio_num), ESP_ERR_INVALID_ARG, RTCIO_TAG, "RTCIO number error");
-    RTCIO_ENTER_CRITICAL();
+    RTCIO_ENTER_CRITICAL_SAFE();
     rtcio_hal_pullup_enable(rtc_io_number_get(gpio_num));
-    RTCIO_EXIT_CRITICAL();
+    RTCIO_EXIT_CRITICAL_SAFE();
 
     return ESP_OK;
 }
@@ -117,9 +119,9 @@ esp_err_t rtc_gpio_pullup_en(gpio_num_t gpio_num)
 esp_err_t rtc_gpio_pullup_dis(gpio_num_t gpio_num)
 {
     ESP_RETURN_ON_FALSE(rtc_gpio_is_valid_gpio(gpio_num), ESP_ERR_INVALID_ARG, RTCIO_TAG, "RTCIO number error");
-    RTCIO_ENTER_CRITICAL();
+    RTCIO_ENTER_CRITICAL_SAFE();
     rtcio_hal_pullup_disable(rtc_io_number_get(gpio_num));
-    RTCIO_EXIT_CRITICAL();
+    RTCIO_EXIT_CRITICAL_SAFE();
 
     return ESP_OK;
 }
@@ -127,9 +129,9 @@ esp_err_t rtc_gpio_pullup_dis(gpio_num_t gpio_num)
 esp_err_t rtc_gpio_pulldown_en(gpio_num_t gpio_num)
 {
     ESP_RETURN_ON_FALSE(rtc_gpio_is_valid_gpio(gpio_num), ESP_ERR_INVALID_ARG, RTCIO_TAG, "RTCIO number error");
-    RTCIO_ENTER_CRITICAL();
+    RTCIO_ENTER_CRITICAL_SAFE();
     rtcio_hal_pulldown_enable(rtc_io_number_get(gpio_num));
-    RTCIO_EXIT_CRITICAL();
+    RTCIO_EXIT_CRITICAL_SAFE();
 
     return ESP_OK;
 }
@@ -137,9 +139,9 @@ esp_err_t rtc_gpio_pulldown_en(gpio_num_t gpio_num)
 esp_err_t rtc_gpio_pulldown_dis(gpio_num_t gpio_num)
 {
     ESP_RETURN_ON_FALSE(rtc_gpio_is_valid_gpio(gpio_num), ESP_ERR_INVALID_ARG, RTCIO_TAG, "RTCIO number error");
-    RTCIO_ENTER_CRITICAL();
+    RTCIO_ENTER_CRITICAL_SAFE();
     rtcio_hal_pulldown_disable(rtc_io_number_get(gpio_num));
-    RTCIO_EXIT_CRITICAL();
+    RTCIO_EXIT_CRITICAL_SAFE();
 
     return ESP_OK;
 }
