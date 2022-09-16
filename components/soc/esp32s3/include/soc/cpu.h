@@ -17,13 +17,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "xtensa/corebits.h"
-
-/* C macros for xtensa special register read/write/exchange */
-
-#define RSR(reg, curval)  asm volatile ("rsr %0, " #reg : "=r" (curval));
-#define WSR(reg, newval)  asm volatile ("wsr %0, " #reg : : "r" (newval));
-#define XSR(reg, swapval) asm volatile ("xsr %0, " #reg : "+r" (swapval));
+#include "xtensa/config/specreg.h"
+#include "xt_instr_macros.h"
 
 /** @brief Read current stack pointer address
  *
